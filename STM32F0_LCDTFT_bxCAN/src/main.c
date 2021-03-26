@@ -39,7 +39,7 @@ int main(void)
 	while (1)
 	{
 		can_send_data();
-//		delay_ms(1000);
+		delay_ms(1000);
 		update_io();
 	}
 	return 0;
