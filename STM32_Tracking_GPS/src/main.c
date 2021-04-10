@@ -26,10 +26,10 @@
  */
 
 // ----------------------------------------------------------------------------
-#include <stdio.h>
-#include <stdlib.h>
-#include "diag/Trace.h"
-#include "stm32f10x.h"
+#include <main.h>
+#include "simcom/sim800.h"
+#include "service/delay.h"
+#include "power/power.h"
 // ----------------------------------------------------------------------------
 //
 // Semihosting STM32F1 empty sample (trace via DEBUG).
@@ -49,22 +49,14 @@
 #pragma GCC diagnostic ignored "-Wunused-parameter"
 #pragma GCC diagnostic ignored "-Wmissing-declarations"
 #pragma GCC diagnostic ignored "-Wreturn-type"
-volatile uint32_t msTicks=0;
-void delay_ms(uint32_t ms);
+void user_led_init();
 int main(int argc, char* argv[])
 {
 	SysTick_Config(SystemCoreClock/1000);
-	GPIO_InitTypeDef GPIO_init_struct;
-	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA|RCC_APB2Periph_GPIOC, ENABLE);
-	GPIO_init_struct.GPIO_Pin = GPIO_Pin_8;
-	GPIO_init_struct.GPIO_Mode = GPIO_Mode_Out_PP;
-	GPIO_init_struct.GPIO_Speed = GPIO_Speed_50MHz;
-	GPIO_Init(GPIOA, &GPIO_init_struct);
-	GPIO_Init(GPIOC, &GPIO_init_struct);
-	GPIO_ResetBits(GPIOC, GPIO_Pin_8);
-	delay_ms(2000);
-	GPIO_SetBits(GPIOC, GPIO_Pin_8);
-
+	power_reset_sim();
+	user_led_init();
+	sim_gpio_init();
+	sim_power_on();
 	while(1)
 	{
  		GPIO_SetBits(GPIOA, GPIO_Pin_8);
@@ -74,17 +66,14 @@ int main(int argc, char* argv[])
 	}
 	return 0;
 }
-void delay_ms(uint32_t ms)
+void user_led_init()
 {
-	msTicks=ms;
-	while(msTicks);
-}
-void SysTick_Handler(void)
-{
-	if(msTicks !=0)
-	{
-			msTicks--;
-	}
+	GPIO_InitTypeDef GPIO_init_struct;
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
+	GPIO_init_struct.GPIO_Pin = GPIO_Pin_8;
+	GPIO_init_struct.GPIO_Mode = GPIO_Mode_Out_PP;
+	GPIO_init_struct.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPIOA, &GPIO_init_struct);
 }
 #pragma GCC diagnostic pop
 
