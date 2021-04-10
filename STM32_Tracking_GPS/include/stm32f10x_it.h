@@ -13,9 +13,7 @@ void HardFault_Handler(void);
 void SVC_Handler(void);
 void PendSV_Handler(void);
 void SysTick_Handler(void);
-void USART1_IRQHandler(void);
-void CEC_CAN_IRQHandler(void);
-void USART2_IRQHandler(void);
+void TIM2_IRQHandler(void);
 
 /*void PPP_IRQHandler(void);*/
 

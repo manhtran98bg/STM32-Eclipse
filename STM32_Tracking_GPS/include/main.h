@@ -15,4 +15,5 @@
 #include "diag/Trace.h"
 #include "stm32f10x.h"
 #include "port_pin.h"
+#include "stm32f10x_conf.h"
 #endif /* MAIN_H_ */
