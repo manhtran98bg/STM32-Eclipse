@@ -26,4 +26,5 @@
 #define GSM_POWERKEY	GPIO_Pin_8				//PC8: POWERKEY PIN TO POWER ON SIM800, Pull low at least 1.2s and release to power on/off
 #define GSM_STATUS 		GPIO_Pin_9				//PC9: POWER ON STATUS PIN OF SIM800.
 
+
 #endif /* PORT_PIN_H_ */

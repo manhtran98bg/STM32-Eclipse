@@ -4,6 +4,7 @@
 #include "service/delay.h"
 #include "power/power.h"
 #include "sensor/dht11.h"
+#include "usart/usart.h"
 // ----------------------------------------------------------------------------
 
 #pragma GCC diagnostic push
@@ -13,11 +14,12 @@
 
 // ----------------------------------------------------------------------------
 dht11_data data;
+extern uint8_t RxBuffer[];
 // ----------------------------------------------------------------------------
-void user_led_init();
-void tim4_init();
-void user_led_toggle();
-void clk_init();
+static void user_led_init();
+static void user_led_toggle();
+static void tim4_init();
+static void clk_init();
 int main(int argc, char* argv[])
 {
 
@@ -27,27 +29,32 @@ int main(int argc, char* argv[])
 	power_reset_sim();
 	user_led_init();
 	tim4_init();
-//	sim_gpio_init();
-//	sim_power_on();
+	sim_gpio_init();
+	sim_power_on();
+	usart_init();
+	power_on_gps();
+	delay_ms(1000);
+	UART4_Send_String((uint8_t*)"$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n");
 	while(1)
 	{
-//		user_led_toggle();
-		if (dht11_read_data(&data))
-		{
-#if _DEBUG
-			trace_printf("Success, Temp = %d.%d; Hum = %d.%d\n",data.Temp_Byte1,data.Temp_Byte2,data.RH_Byte1,data.RH_Byte2);
-#endif
-		}
-		else {
-#if _DEBUG
-			trace_puts("ERROR");
-#endif
-		}
-		delay_ms(1500);
+		user_led_toggle();
+//		UART5_Send_String((uint8_t*)"Hj\n");
+//		if (dht11_read_data(&data))
+//		{
+//#if _DEBUG
+//			trace_printf("Success, Temp = %d.%d; Hum = %d.%d\n",data.Temp_Byte1,data.Temp_Byte2,data.RH_Byte1,data.RH_Byte2);
+//#endif
+//		}
+//		else {
+//#if _DEBUG
+//			trace_puts("ERROR");
+//#endif
+//		}
+		delay_ms(1000);
 	}
 	return 0;
 }
-void user_led_init()
+static void user_led_init()
 {
 	GPIO_InitTypeDef GPIO_init_struct;
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
@@ -56,7 +63,7 @@ void user_led_init()
 	GPIO_init_struct.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA, &GPIO_init_struct);
 }
-void user_led_toggle()
+static void user_led_toggle()
 {
 	GPIOA->ODR ^=USER_LED;
 	dUS_tim4(65000);
@@ -64,7 +71,7 @@ void user_led_toggle()
 /*	TIMER 4 Config 1uS, SysClock = 72Mhz
  * 	Prescaler = 71
  */
-void tim4_init()
+static void tim4_init()
 {
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStruct;
@@ -75,7 +82,7 @@ void tim4_init()
 	TIM_TimeBaseInit(TIM4,&TIM_TimeBaseInitStruct);
 	TIM_ClearFlag(TIM4, TIM_FLAG_Update);
 }
-void clk_init()
+static void clk_init()
 {
 	RCC_DeInit();
 	RCC_HSICmd(DISABLE);
