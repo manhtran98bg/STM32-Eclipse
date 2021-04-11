@@ -12,4 +12,6 @@
 void power_reset_sim();
 void power_off_sim();
 void power_on_sim();
+void power_off_gps();
+void power_on_gps();
 #endif /* POWER_POWER_H_ */
