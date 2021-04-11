@@ -5,6 +5,7 @@
  *      Author: manht
  */
 #include "dht11.h"
+// ----------------------------------------------------------------------------
 static void dht11_gpio_input()
 {
 	GPIO_InitTypeDef GPIO_InitStruct;
@@ -13,6 +14,7 @@ static void dht11_gpio_input()
 	GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOC, &GPIO_InitStruct);
 }
+// ----------------------------------------------------------------------------
 static void dht11_gpio_output()
 {
 	GPIO_InitTypeDef GPIO_InitStruct;
@@ -21,22 +23,27 @@ static void dht11_gpio_output()
 	GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOC, &GPIO_InitStruct);
 }
+// ----------------------------------------------------------------------------
 static void dht11_gpio_clk()
 {
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
 }
+// ----------------------------------------------------------------------------
 static void dht11_set_gpio()
 {
 	GPIO_SetBits(GPIOC, DHT11_IN);
 }
+// ----------------------------------------------------------------------------
 static void dht11_reset_gpio()
 {
 	GPIO_ResetBits(GPIOC, DHT11_IN);
 }
+// ----------------------------------------------------------------------------
 static u8 dht11_read_input()
 {
 	return GPIO_ReadInputDataBit(GPIOC, DHT11_IN);
 }
+// ----------------------------------------------------------------------------
 static void dht11_init()
 {
 	dht11_gpio_clk();
@@ -47,6 +54,7 @@ static void dht11_init()
 	dUS_tim4(20);
 	dht11_gpio_input();		//set pin as input;
 }
+// ----------------------------------------------------------------------------
 static int8_t dht11_check_response()
 {
 	int8_t res = 0;
@@ -60,6 +68,7 @@ static int8_t dht11_check_response()
 	while(dht11_read_input());
 	return res;
 }
+// ----------------------------------------------------------------------------
 static uint8_t dht11_read_d8()
 {
 	uint8_t i=0,j;
@@ -76,6 +85,7 @@ static uint8_t dht11_read_d8()
 	}
 	return i;
 }
+// ----------------------------------------------------------------------------
 u8 dht11_read_data(dht11_data *dat)
 {
 	dht11_init();
