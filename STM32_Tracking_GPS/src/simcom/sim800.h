@@ -8,9 +8,11 @@
 #ifndef SIMCOM_SIM800_H_
 #define SIMCOM_SIM800_H_
 #include <main.h>
+#include <string.h>
+#define _DEBUG_AT_CMD 1
+#define _DEBUG_SIM_UART5	1
 void sim_gpio_init();
-void sim_power_on();
+uint8_t sim_power_on();
 void sim_power_off();
-uint8_t sim_power_status();
-
+uint8_t sim_init();
 #endif /* SIMCOM_SIM800_H_ */

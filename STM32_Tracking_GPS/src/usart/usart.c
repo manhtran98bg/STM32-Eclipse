@@ -5,15 +5,15 @@
  *      Author: manht
  */
 #include "usart.h"
-__IO uint8_t RxBuffer1[64];
+
+__IO uint8_t RxBuffer1[BUFFER_SIZE1];
 __IO uint8_t RxCounter1=0;
 
-__IO uint8_t RxBuffer5[64];
- __IO uint8_t RxCounter5=0;
+__IO uint8_t RxBuffer5[BUFFER_SIZE5];
+__IO uint8_t RxCounter5=0;
 
- __IO uint8_t RxBuffer4[64];
-  __IO uint8_t RxCounter4=0;
-
+__IO uint8_t RxBuffer4[BUFFER_SIZE4];
+__IO uint8_t RxCounter4=0;
 uint8_t RxBuffer[1024];
 
 static void usart_clk_init(void);
@@ -165,6 +165,26 @@ void UART4_Send_String(uint8_t *str)
 		while(USART_GetFlagStatus(UART4,USART_FLAG_TXE) == RESET);
 		USART_SendData(UART4,*str);
 		str++;
+	}
+}
+void USART_clear_buf(uint8_t USARTx)
+{
+	switch (USARTx)
+	{
+	case 1:
+		for (int i=0;i<BUFFER_SIZE1;i++) RxBuffer1[i]=0;
+		RxCounter1=0;
+		break;
+	case 4:
+		for (int i=0;i<BUFFER_SIZE4;i++) RxBuffer4[i]=0;
+		RxCounter4=0;
+		break;
+	case 5:
+		for (int i=0;i<BUFFER_SIZE5;i++) RxBuffer5[i]=0;
+		RxCounter5=0;
+		break;
+	default:
+		break;
 	}
 }
 

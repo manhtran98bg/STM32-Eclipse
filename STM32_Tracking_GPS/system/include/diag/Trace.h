@@ -55,7 +55,6 @@
 // This has the advantage that the trace call do not need to be conditionally
 // compiled with #ifdef TRACE/#endif
 
-
 #if defined(TRACE)
 
 #if defined(__cplusplus)

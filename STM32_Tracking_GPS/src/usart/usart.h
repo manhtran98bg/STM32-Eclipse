@@ -9,6 +9,11 @@
 #define USART_USART_H_
 #include "main.h"
 #define _USE_DMA	0
+#define BUFFER_SIZE1	128
+#define BUFFER_SIZE4	128
+#define BUFFER_SIZE5	128
+
+
 /*----------------------------------------- Define UART5 ----------------------------------*/
 /* UART5 For Debug*/
 #define UART5_CLK	RCC_APB1Periph_UART5
@@ -38,4 +43,5 @@ void usart_init();
 void USART1_Send_String(uint8_t *str);
 void UART5_Send_String(uint8_t *str);
 void UART4_Send_String(uint8_t *str);
+void USART_clear_buf(uint8_t USARTx);
 #endif /* USART_USART_H_ */

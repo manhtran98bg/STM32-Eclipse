@@ -1,6 +1,6 @@
 
 #include "stm32f10x_it.h"
-
+#include "usart/usart.h"
 volatile uint32_t msTicks=0;
 volatile uint32_t myTicks_tim4=0;
 extern __IO uint8_t RxBuffer1[];
@@ -49,7 +49,6 @@ void UART5_IRQHandler(void)
 {
 	if(USART_GetITStatus(UART5, USART_IT_RXNE) != RESET)
 	{
-		//USART_SendData(UART5, USART_ReceiveData(UART5));
 		if (RxCounter5<64) RxBuffer5[RxCounter5++]=USART_ReceiveData(UART5);
 		else RxCounter5 = 0;
 	}
@@ -65,10 +64,11 @@ void UART4_IRQHandler(void)
 }
 void USART1_IRQHandler(void)
 {
+	uint16_t c;
 	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
 	{
-		//USART_SendData(UART5, USART_ReceiveData(USART1));
-		if (RxCounter1<64) RxBuffer1[RxCounter1++]=USART_ReceiveData(USART1);
+		c = USART_ReceiveData(USART1);
+		if (RxCounter1<BUFFER_SIZE1) RxBuffer1[RxCounter1++]=c;
 		else RxCounter1 = 0;
 	}
 }
