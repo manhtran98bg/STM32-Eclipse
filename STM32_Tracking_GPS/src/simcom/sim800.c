@@ -8,7 +8,6 @@
 #include "../service/delay.h"
 #include "../usart/usart.h"
 extern __IO uint8_t RxBuffer1[];
-extern __IO uint8_t RxCounter1;
 
 void sim_gpio_init()
 {
@@ -111,7 +110,7 @@ static void sim_send_cmd(uint8_t* cmd, uint16_t ms)
 	trace_puts((char*)RxBuffer1);
 #endif
 #if _DEBUG_SIM_UART5 && _DEBUG_AT_CMD
-	UART5_Send_String(RxBuffer1);
+	UART5_Send_String((uint8_t*)RxBuffer1);
 #endif
 
 }

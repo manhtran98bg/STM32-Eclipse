@@ -6,6 +6,7 @@
 #include "sensor/dht11.h"
 #include "usart/usart.h"
 #include "rfid/mfrc552.h"
+#include "gps/gps.h"
 // ----------------------------------------------------------------------------
 
 #pragma GCC diagnostic push
@@ -15,15 +16,15 @@
 
 // ----------------------------------------------------------------------------
 dht11_data data;
-extern uint8_t RxBuffer[];
-extern __IO uint8_t RxBuffer1[];
-extern __IO uint8_t RxCounter1;
-
-extern __IO uint8_t RxBuffer5[];
-extern __IO uint8_t RxCounter5;
-
-extern __IO uint8_t RxBuffer4[];
-extern __IO uint8_t RxCounter4;
+//extern uint8_t RxBuffer[];
+//extern __IO uint8_t RxBuffer1[];
+//extern __IO uint8_t RxCounter1;
+//
+//extern __IO uint8_t RxBuffer5[];
+//extern __IO uint8_t RxCounter5;
+//
+//extern __IO uint8_t RxBuffer4[];
+//extern __IO uint8_t RxCounter4;
 
 
 u8 status;
@@ -38,6 +39,7 @@ static void tim4_init();
 static void clk_init();
 int main(int argc, char* argv[])
 {
+	u8 cnt=0;
 	clk_init();
 	SystemCoreClockUpdate();
 	SysTick_Config(SystemCoreClock/1000);
@@ -47,31 +49,32 @@ int main(int argc, char* argv[])
 	sim_gpio_init();
 	usart_init();
 	MFRC522_Init();
+	gps_init();
 //	if	(!sim_power_on())
 //	{
 //		while(1);	// Sim can't start because no Power.
 //	}
 //	if (!sim_init())
 //	{
-//		while(1);	//Sim can't init, check log.
+////		while(1);	//Sim can't init, check log.
 //	}
 //	delay_ms(5000);
-//	power_on_gps();
-//	UART4_Send_String((uint8_t*)"$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n");
-//	delay_ms(1000);
 	while(1)
 	{
-		status = MFRC522_Request(PICC_REQIDL, str);
-				if (status == MI_OK)
-				{
-					trace_printf("Find out a card: %x, %x\r\n",str[0],str[1]);
-				}
-				status = MFRC522_Anticoll(str);
-						memcpy(serNum, str, 5);
-						if (status == MI_OK)
-						{
-							trace_printf("Your card's number are: %x, %x, %x, %x, %x \r\n",serNum[0], serNum[1], serNum[2], serNum[3],serNum[4]);
-						}
+			if (gps_read_data()){
+				user_led_toggle();
+			}
+//		status = MFRC522_Request(PICC_REQIDL, str);
+//				if (status == MI_OK)
+//				{
+//					trace_printf("Find out a card: %x, %x\r\n",str[0],str[1]);
+//				}
+//				status = MFRC522_Anticoll(str);
+//						memcpy(serNum, str, 5);
+//						if (status == MI_OK)
+//						{
+//							trace_printf("Your card's number are: %x, %x, %x, %x, %x \r\n",serNum[0], serNum[1], serNum[2], serNum[3],serNum[4]);
+//						}
 //		if (dht11_read_data(&data))
 //		{
 //#if _DEBUG
@@ -104,8 +107,10 @@ static void user_led_init()
 }
 static void user_led_toggle()
 {
-	GPIOA->ODR ^=USER_LED;
-	dUS_tim4(65000);
+	//GPIOA->ODR ^=USER_LED;
+	GPIO_SetBits(GPIOA, USER_LED);
+	dUS_tim4(50000);
+	GPIO_ResetBits(GPIOA, USER_LED);
 }
 /*	TIMER 4 Config 1uS, SysClock = 72Mhz
  * 	Prescaler = 71

@@ -11,6 +11,7 @@ extern __IO uint8_t RxCounter5;
 
 extern __IO uint8_t RxBuffer4[];
 extern __IO uint8_t RxCounter4;
+extern __IO uint8_t flagStart,flagStop;
 void NMI_Handler(void)
 {
 
@@ -55,11 +56,24 @@ void UART5_IRQHandler(void)
 }
 void UART4_IRQHandler(void)
 {
+	uint8_t c;
 	if(USART_GetITStatus(UART4, USART_IT_RXNE) != RESET)
 	{
-		USART_SendData(UART5, USART_ReceiveData(UART4));
-//		if (RxCounter4<64) RxBuffer4[RxCounter4++]=USART_ReceiveData(UART4);
-//		else RxCounter4 = 0;
+		c = USART_ReceiveData(UART4);
+		if (c=='$') {	//Start NMEA Sentence
+			flagStart = 1;	//Flag indicate Start of NMEA Sentence
+			RxCounter4 = 0;
+			flagStop = 0;	//Flag indicate End of NMEA Sentence
+		}
+		if (c=='\n') {
+			flagStart = 0;
+			flagStop = 1;
+		}
+		if (flagStart){
+			if (RxCounter4<64) RxBuffer4[RxCounter4++]=c;	//Save Data to RxBuffer4
+			else RxCounter4 = 0;
+		}
+
 	}
 }
 void USART1_IRQHandler(void)
