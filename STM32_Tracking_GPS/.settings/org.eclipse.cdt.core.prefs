@@ -1,0 +1,6 @@
+eclipse.preferences.version=1
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1052065911/PATH/delimiter=;
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1052065911/PATH/operation=append
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1052065911/PATH/value=${GCC_EABI}
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1052065911/append=true
+environment/project/ilg.gnuarmeclipse.managedbuild.cross.config.elf.debug.1052065911/appendContributed=true

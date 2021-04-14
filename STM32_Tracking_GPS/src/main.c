@@ -50,14 +50,14 @@ int main(int argc, char* argv[])
 	usart_init();
 	MFRC522_Init();
 	gps_init();
-//	if	(!sim_power_on())
-//	{
-//		while(1);	// Sim can't start because no Power.
-//	}
-//	if (!sim_init())
-//	{
-////		while(1);	//Sim can't init, check log.
-//	}
+	if	(!sim_power_on())
+	{
+		while(1);	// Sim can't start because no Power.
+	}
+	if (!sim_init())
+	{
+//		while(1);	//Sim can't init, check log.
+	}
 //	delay_ms(5000);
 	while(1)
 	{
