@@ -29,6 +29,8 @@ dht11_data data;
 
 u8 status;
 u8 str[16]; // Max_LEN = 16
+const char IP_Address[15]="139.162.3.35";
+const char Port[5]="1883";
 uchar serNum[5];
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -39,7 +41,7 @@ static void tim4_init();
 static void clk_init();
 int main(int argc, char* argv[])
 {
-	u8 cnt=0;
+
 	clk_init();
 	SystemCoreClockUpdate();
 	SysTick_Config(SystemCoreClock/1000);
@@ -56,9 +58,15 @@ int main(int argc, char* argv[])
 	}
 	if (!sim_init())
 	{
-//		while(1);	//Sim can't init, check log.
+		while(1);	//Sim can't init, check log.
 	}
-//	delay_ms(5000);
+	if (!sim_connect_server((char*)IP_Address,(char*)Port)){
+		while(1);	//Sim can't connect to server.
+	}
+	if (!sim_disconnect_server(IP_Address,Port))
+	{
+		while(1);
+	}
 	while(1)
 	{
 			if (gps_read_data()){
@@ -98,12 +106,6 @@ static void user_led_init()
 	GPIO_init_struct.GPIO_Mode = GPIO_Mode_Out_PP;
 	GPIO_init_struct.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA, &GPIO_init_struct);
-//	GPIO_InitTypeDef GPIO_InitStruct;
-//	GPIO_InitStruct.GPIO_Pin = GPIO_Pin_4;
-//	GPIO_InitStruct.GPIO_Mode = GPIO_Mode_Out_PP;
-//	GPIO_InitStruct.GPIO_Speed = GPIO_Speed_50MHz;
-//	GPIO_Init(GPIOA, &GPIO_InitStruct);
-//	GPIO_SetBits(GPIOA, GPIO_Pin_4);
 }
 static void user_led_toggle()
 {

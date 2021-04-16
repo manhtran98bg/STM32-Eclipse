@@ -50,14 +50,6 @@ static void gps_rst_pin_init()
 	GPIO_Init(GPS_RST_PORT, &GPIO_InitStruct);
 	GPIO_ResetBits(GPS_RST_PORT, GPS_RST_PIN);
 }
-static uint8_t gps_check_cmd(uint8_t * cmd, __IO uint8_t * response)
-{
-	char* res;
-	UART4_Send_String(cmd);
-	res = strstr((char*)response,(char*)cmd);
-	if (res) return 1;
-	else return 0;
-}
 void gps_init()
 {
 	gps_rst_pin_init();

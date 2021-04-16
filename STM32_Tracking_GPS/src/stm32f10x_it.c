@@ -70,7 +70,7 @@ void UART4_IRQHandler(void)
 			flagStop = 1;
 		}
 		if (flagStart){
-			if (RxCounter4<64) RxBuffer4[RxCounter4++]=c;	//Save Data to RxBuffer4
+			if (RxCounter4<BUFFER_SIZE4) RxBuffer4[RxCounter4++]=c;	//Save Data to RxBuffer4
 			else RxCounter4 = 0;
 		}
 
