@@ -29,8 +29,9 @@ dht11_data data;
 
 u8 status;
 u8 str[16]; // Max_LEN = 16
-const char IP_Address[15]="139.162.3.35";
-const char Port[5]="1883";
+const char IP_Address[15]="118.68.132.242";
+//const char IP_Address[15]="google.com.vn";
+const char Port[5]="8080";
 uchar serNum[5];
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -40,8 +41,11 @@ static void user_led_toggle();
 static void tim4_init();
 static void clk_init();
 int main(int argc, char* argv[])
-{
-
+ {
+	server *Server=(server*)malloc(sizeof(server));
+	Server->IP = (char*)IP_Address;
+	Server->Port = (char*)Port;
+	Server->state = NOT_CONNECT;
 	clk_init();
 	SystemCoreClockUpdate();
 	SysTick_Config(SystemCoreClock/1000);
@@ -60,10 +64,14 @@ int main(int argc, char* argv[])
 	{
 		while(1);	//Sim can't init, check log.
 	}
-	if (!sim_connect_server((char*)IP_Address,(char*)Port)){
+	if (!sim_set_TCP_connection())
+	{
+		while(1);
+	}
+	if (!sim_connect_server(Server)){
 		while(1);	//Sim can't connect to server.
 	}
-	if (!sim_disconnect_server(IP_Address,Port))
+	if (!sim_disconnect_server(Server))
 	{
 		while(1);
 	}

@@ -8,7 +8,6 @@
 #include "../service/delay.h"
 #include "../usart/usart.h"
 extern __IO uint8_t RxBuffer1[];
-
 void sim_gpio_init()
 {
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
@@ -195,24 +194,12 @@ static uint8_t sim_check_reg()
 		sim_send_cmd((uint8_t*)"AT+CREG?\r\n", 1000);
 		r = sim_check_cmd(RxBuffer1, (uint8_t*)"+CREG: 0,1\r\n");
 		time_out++;
-	}while ((time_out<20)&&(!r));
-	if (time_out>=20){
+	}while ((time_out<60)&&(!r));
+	if (time_out>=60){
 		sim_log("Not registered.");
 		return 0;
 	}
 	sim_log("Registered, home network.");
-	return 1;
-}
-/* Init Sim800
- * Param: No
- * Return:		1:SUCCESS
- * 				0:FAIL
- */
-uint8_t sim_init()
-{
-	if (!sim_check_response()) return 0;
-	if (!sim_check_simcard()) return 0;
-	if (!sim_check_reg()) return 0;
 	return 1;
 }
 /* Ket noi GPRS
@@ -265,6 +252,7 @@ static uint8_t sim_set_APN()
 	u8 r=0;
 	time_out = 0;
 	do{
+		//sim_send_cmd((uint8_t*)"AT+CSTT=\"m-wap\",\"mms\",\"mms\"\r\n", 1000);
 		sim_send_cmd((uint8_t*)"AT+CSTT=\"CMNET\"\r\n", 1000);
 		r = sim_check_cmd(RxBuffer1, (uint8_t*)"OK\r\n");
 		time_out++;
@@ -308,30 +296,8 @@ static uint8_t sim_get_local_IP()
 		sim_log("Can not get Local IP Address!");
 		return 0;
 	}
-	//strcpy(ip,RxBuffer);
+	memset(buff,0,40);
 	sprintf((char*)buff,"Your Local IP Address: %s",RxBuffer1);
-	sim_log((char*)buff);
-	return 1;
-}
-static uint8_t sim_start_connect_server(const char* IP_Addr, const char* Port)
-{
-	u8 time_out=0;
-	u8 r=0;
-	char buff[60];
-	sprintf((char*)buff,"Start connecting to: %s:%s",IP_Addr,Port);
-	sim_log((char*)buff);
-	sprintf((char*)buff,"AT+CIPSTART=\"TCP\",\"%s\",\"%s\"\r\n",IP_Addr,Port);
-	time_out = 0;
-	do{
-		sim_send_cmd((uint8_t*)buff, 2000);
-		r = sim_check_cmd(RxBuffer1, (uint8_t*)"OK\r\n\r\nCONNECT OK");
-		time_out++;
-	}while ((time_out<20)&&(!r));
-	if (time_out>=20){
-		sprintf((char*)buff,"Connecting to: %s:%s: FAILED",IP_Addr,Port);
-		return 0;
-	}
-	sprintf((char*)buff,"Connecting to: %s:%s: SUCCESS",IP_Addr,Port);
 	sim_log((char*)buff);
 	return 1;
 }
@@ -359,42 +325,68 @@ static uint8_t	sim_close_tcp()
 	return 1;
 }
 
-/* Kiem tra trang thai ket noi voi server
- * Param: 	IP: Dia chi IP cua Server
- * 			Port: Ten Port
- * Return: 	1: Already Connected
- *
+/* Init Sim800
+ * Param: No
+ * Return:		1:SUCCESS
+ * 				0:FAIL
  */
-uint8_t sim_check_connection_state(char* IP, char* Port)
+uint8_t sim_init()
 {
-	u8 buff[40];
-	sprintf((char*)buff,"Check connection to: %s:%s",IP,Port);
-	sim_log((char*)buff);
-	sprintf((char*)buff,"AT+CIPSTART=\"TCP\",\"%s\",\"%s\"\r\n",IP,Port);
-	sim_send_cmd((uint8_t*)buff, 2000);
-	if (sim_check_cmd(RxBuffer1, (uint8_t*)"ERROR\r\n\r\nALREADY CONNECT")) {
-		sim_log("ALREADY CONNECTED.");
-		return 1;
-	}
-	return 0;
-}
-uint8_t sim_connect_server(const char* IP_adr, const char* Port)
-{
-	char IP_tmp[16];
-	char Port_tmp[5];
-	strcpy(IP_tmp,IP_adr);
-	strcpy(Port_tmp,Port);
-//	trace_puts(IP_tmp);
+	if (!sim_check_response()) return 0;
+	if (!sim_check_simcard()) return 0;
+	if (!sim_check_reg()) return 0;
 	if (!sim_attach_gprs()) return 0;
 	if (!sim_set_APN()) return 0;
-	if (!sim_bringup_wireless_connection()) return 0;
-	if (!sim_get_local_IP()) return 0;
-	if (!sim_start_connect_server(IP_tmp, Port_tmp)) return 0;
 	return 1;
 }
-uint8_t sim_disconnect_server(char* IP, char* Port)
+
+static void sim_send_test_message()
 {
-	if(!sim_close_tcp()) return 0;
+	sim_send_cmd("AT+CIPSEND\r\n", 1000);
+	USART_SendData(USART1, 0x10);
+	USART1_Send_String("TESTT1234");
+	USART_SendData(USART1, 0x1A);
+}
+uint8_t sim_set_TCP_connection()
+{
+	if (!sim_bringup_wireless_connection()) return 0;
+	if (!sim_get_local_IP()) return 0;
+	return 1;
+}
+uint8_t sim_connect_server(server *myServer)
+{
+	u8 time_out=0;
+	u8 r=0;
+	char buff[60];
+	memset(buff,0,60);
+	sprintf((char*)buff,"Start connecting to: %s:%s",myServer->IP,myServer->Port);
+	sim_log((char*)buff);
+	memset(buff,0,60);
+	sprintf((char*)buff,"AT+CIPSTART=\"TCP\",\"%s\",\"%s\"\r\n",myServer->IP,myServer->Port);
+	time_out = 0;
+	do{
+		sim_send_cmd((uint8_t*)buff, 2000);
+		r = sim_check_cmd(RxBuffer1, (uint8_t*)"OK\r\n\r\n");
+		time_out++;
+	}while ((time_out<10)&&(!r));
+	if (time_out>=10){
+		memset(buff,0,60);
+		sprintf((char*)buff,"Connecting to: %s:%s: FAILED",myServer->IP,myServer->Port);
+		myServer->state = NOT_CONNECT;
+		return 0;
+	}
+	memset(buff,0,60);
+	sprintf((char*)buff,"Connecting to: %s:%s: SUCCESS",myServer->IP,myServer->Port);
+	myServer->state = ALREADY_CONNECT;
+	sim_log((char*)buff);
+	return 1;
+}
+uint8_t sim_disconnect_server(server *myServer)
+{
+	if (myServer->state==ALREADY_CONNECT){
+		if(!sim_close_tcp()) return 0;
+		myServer->state = NOT_CONNECT;
+	}
 	if(!sim_detach_gprs()) return 0;
 	return 1;
 }
