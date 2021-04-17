@@ -22,9 +22,9 @@ static void power_gpio_init()
 void power_reset_sim()
 {
 	power_gpio_init();
-	GPIO_SetBits(GPIOB, CTRL_PWR_GSM);
-	delay_ms(100);
-	GPIO_ResetBits(GPIOB, CTRL_PWR_GSM);
+//	GPIO_SetBits(GPIOB, CTRL_PWR_GSM);
+//	delay_ms(100);
+//	GPIO_ResetBits(GPIOB, CTRL_PWR_GSM);
 }
 void power_off_sim()
 {

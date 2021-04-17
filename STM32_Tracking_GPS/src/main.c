@@ -45,7 +45,6 @@ int main(int argc, char* argv[])
 	server *Server=(server*)malloc(sizeof(server));
 	Server->IP = (char*)IP_Address;
 	Server->Port = (char*)Port;
-	Server->state = NOT_CONNECT;
 	clk_init();
 	SystemCoreClockUpdate();
 	SysTick_Config(SystemCoreClock/1000);
@@ -53,6 +52,7 @@ int main(int argc, char* argv[])
 	user_led_init();
 	tim4_init();
 	sim_gpio_init();
+	sim_power_off();
 	usart_init();
 	MFRC522_Init();
 	gps_init();
@@ -71,6 +71,9 @@ int main(int argc, char* argv[])
 	if (!sim_connect_server(Server)){
 		while(1);	//Sim can't connect to server.
 	}
+	for(int i=0;i<10;i++){
+	sim_send_message("This is test Message \r\n");
+	};
 	if (!sim_disconnect_server(Server))
 	{
 		while(1);

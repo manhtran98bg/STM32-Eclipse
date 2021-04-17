@@ -11,10 +11,19 @@
 #include <string.h>
 #define _DEBUG_AT_CMD 1
 #define _DEBUG_SIM_UART5	1
-#define _DEBUG_AT_UART5	1
+#define _DEBUG_AT_UART5	0
 typedef enum {
-	ALREADY_CONNECT,
-	NOT_CONNECT
+	IP_INITIAL,
+	IP_START,
+	IP_CONFIG,
+	IP_GPRSACT,
+	IP_STATUS,
+	TCP_CONNECTING,
+	CONNECT_OK,
+	TCP_CLOSING,
+	TCP_CLOSED,
+	PDP_DEACT,
+	DEFAUT
 }state;
 typedef struct server{
 	char *IP;
@@ -29,4 +38,6 @@ uint8_t sim_init();
 uint8_t sim_connect_server(server* myServer);
 uint8_t sim_disconnect_server(server *myServer);
 uint8_t sim_set_TCP_connection();
+uint8_t sim_send_message(uint8_t* message);
+state sim_current_connection_status();
 #endif /* SIMCOM_SIM800_H_ */

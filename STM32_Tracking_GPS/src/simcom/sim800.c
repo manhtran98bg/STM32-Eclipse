@@ -252,8 +252,8 @@ static uint8_t sim_set_APN()
 	u8 r=0;
 	time_out = 0;
 	do{
-		//sim_send_cmd((uint8_t*)"AT+CSTT=\"m-wap\",\"mms\",\"mms\"\r\n", 1000);
-		sim_send_cmd((uint8_t*)"AT+CSTT=\"CMNET\"\r\n", 1000);
+		sim_send_cmd((uint8_t*)"AT+CSTT=\"m-wap\",\"mms\",\"mms\"\r\n", 1000);
+//		sim_send_cmd((uint8_t*)"AT+CSTT=\"CMNET\"\r\n", 1000);
 		r = sim_check_cmd(RxBuffer1, (uint8_t*)"OK\r\n");
 		time_out++;
 	}while ((time_out<20)&&(!r));
@@ -285,7 +285,7 @@ static uint8_t sim_get_local_IP()
 {
 	u8 time_out=0;
 	u8 r=0;
-	u8 buff[40];
+	char *buff=(char*)malloc(40*sizeof(char));
 	time_out = 0;
 	do{
 		sim_send_cmd((uint8_t*)"AT+CIFSR\r\n", 2000);
@@ -340,12 +340,22 @@ uint8_t sim_init()
 	return 1;
 }
 
-static void sim_send_test_message()
+uint8_t sim_send_message(uint8_t* message)
 {
-	sim_send_cmd("AT+CIPSEND\r\n", 1000);
+	u8 time_out=0;
+	u8 r=0;
+	sim_send_cmd((uint8_t*)"AT+CIPSEND\r\n", 200);
 	USART_SendData(USART1, 0x10);
-	USART1_Send_String("TESTT1234");
+	USART1_Send_String((uint8_t*)message);
 	USART_SendData(USART1, 0x1A);
+	do{
+		r = sim_check_cmd(RxBuffer1, (uint8_t*)"SEND OK\r\n");
+		time_out++;
+		delay_ms(100);
+	}
+	while ((time_out<10)&&(!r));
+	if (time_out>=10) return 0;
+	return 1;
 }
 uint8_t sim_set_TCP_connection()
 {
@@ -357,7 +367,7 @@ uint8_t sim_connect_server(server *myServer)
 {
 	u8 time_out=0;
 	u8 r=0;
-	char buff[60];
+	char *buff=(char*)malloc(60*sizeof(char));
 	memset(buff,0,60);
 	sprintf((char*)buff,"Start connecting to: %s:%s",myServer->IP,myServer->Port);
 	sim_log((char*)buff);
@@ -365,29 +375,46 @@ uint8_t sim_connect_server(server *myServer)
 	sprintf((char*)buff,"AT+CIPSTART=\"TCP\",\"%s\",\"%s\"\r\n",myServer->IP,myServer->Port);
 	time_out = 0;
 	do{
-		sim_send_cmd((uint8_t*)buff, 2000);
-		r = sim_check_cmd(RxBuffer1, (uint8_t*)"OK\r\n\r\n");
+		sim_send_cmd((uint8_t*)buff, 4000);
+		r = sim_check_cmd(RxBuffer1, (uint8_t*)"OK\r\n\r\nCONNECT OK");
 		time_out++;
-	}while ((time_out<10)&&(!r));
-	if (time_out>=10){
+	}while ((time_out<5)&&(!r));
+	if (time_out>=5){
 		memset(buff,0,60);
 		sprintf((char*)buff,"Connecting to: %s:%s: FAILED",myServer->IP,myServer->Port);
-		myServer->state = NOT_CONNECT;
+		myServer->state = sim_current_connection_status();
 		return 0;
 	}
 	memset(buff,0,60);
 	sprintf((char*)buff,"Connecting to: %s:%s: SUCCESS",myServer->IP,myServer->Port);
-	myServer->state = ALREADY_CONNECT;
+	myServer->state = sim_current_connection_status();
 	sim_log((char*)buff);
 	return 1;
 }
+state sim_current_connection_status()
+{
+	sim_send_cmd((uint8_t*)"AT+CIPSTATUS\r\n", 500);
+	if (sim_check_cmd(RxBuffer1, (uint8_t*)"IP INITIAL\r\n")) return IP_INITIAL;
+	if (sim_check_cmd(RxBuffer1, (uint8_t*)"IP START\r\n")) return IP_START ;
+	if (sim_check_cmd(RxBuffer1, (uint8_t*)"IP CONFIG\r\n")) return IP_CONFIG ;
+	if (sim_check_cmd(RxBuffer1, (uint8_t*)"IP GPRSACT\r\n")) return IP_GPRSACT;
+	if (sim_check_cmd(RxBuffer1, (uint8_t*)"IP STATUS\r\n")) return IP_STATUS;
+	if (sim_check_cmd(RxBuffer1, (uint8_t*)"TCP CONNECTING")) return TCP_CONNECTING;
+	if (sim_check_cmd(RxBuffer1, (uint8_t*)"CONNECT OK\r\n")) return CONNECT_OK;
+	if (sim_check_cmd(RxBuffer1, (uint8_t*)"TCP CLOSING\r\n")) return TCP_CLOSING;
+	if (sim_check_cmd(RxBuffer1, (uint8_t*)"TCP CLOSED\r\n")) return TCP_CLOSED;
+	if (sim_check_cmd(RxBuffer1, (uint8_t*)"PDP DEACT\r\n")) return PDP_DEACT;
+	return DEFAUT;
+
+}
 uint8_t sim_disconnect_server(server *myServer)
 {
-	if (myServer->state==ALREADY_CONNECT){
+	if (myServer->state==CONNECT_OK){
 		if(!sim_close_tcp()) return 0;
-		myServer->state = NOT_CONNECT;
+		myServer->state = sim_current_connection_status();
 	}
 	if(!sim_detach_gprs()) return 0;
+	myServer->state = sim_current_connection_status();
 	return 1;
 }
 
