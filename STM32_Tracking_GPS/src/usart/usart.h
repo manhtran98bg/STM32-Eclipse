@@ -40,7 +40,7 @@
 #define UART4_RX_PIN	GPIO_Pin_11
 
 void usart_init();
-void USART1_Send_String(uint8_t *str);
+void USART1_Send_String(char *str);
 void UART5_Send_String(uint8_t *str);
 void UART4_Send_String(uint8_t *str);
 void USART_clear_buf(uint8_t USARTx);

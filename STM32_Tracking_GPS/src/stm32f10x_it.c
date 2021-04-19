@@ -81,8 +81,9 @@ void USART1_IRQHandler(void)
 	uint16_t c;
 	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
 	{
-		c = USART_ReceiveData(USART1);
-		if (RxCounter1<BUFFER_SIZE1) RxBuffer1[RxCounter1++]=c;
-		else RxCounter1 = 0;
+//		c = USART_ReceiveData(USART1);
+//		if (RxCounter1<BUFFER_SIZE1) RxBuffer1[RxCounter1++]=c;
+//		else RxCounter1 = 0;
+		Sim800_RxCallBack();
 	}
 }

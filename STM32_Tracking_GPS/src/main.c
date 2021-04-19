@@ -7,6 +7,7 @@
 #include "usart/usart.h"
 #include "rfid/mfrc552.h"
 #include "gps/gps.h"
+#include "mqtt/MQTTSim800.h"
 // ----------------------------------------------------------------------------
 
 #pragma GCC diagnostic push
@@ -25,7 +26,7 @@ dht11_data data;
 //
 //extern __IO uint8_t RxBuffer4[];
 //extern __IO uint8_t RxCounter4;
-
+SIM800_t SIM800;
 
 u8 status;
 u8 str[16]; // Max_LEN = 16
@@ -60,24 +61,25 @@ int main(int argc, char* argv[])
 	{
 		while(1);	// Sim can't start because no Power.
 	}
-	if (!sim_init())
-	{
-		while(1);	//Sim can't init, check log.
-	}
-	if (!sim_set_TCP_connection())
-	{
-		while(1);
-	}
-	if (!sim_connect_server(Server)){
-		while(1);	//Sim can't connect to server.
-	}
-	for(int i=0;i<10;i++){
-	sim_send_message("This is test Message \r\n");
-	};
-	if (!sim_disconnect_server(Server))
-	{
-		while(1);
-	}
+	MQTT_Init();
+//	if (!sim_init())
+//	{
+//		while(1);	//Sim can't init, check log.
+//	}
+//	if (!sim_set_TCP_connection())
+//	{
+//		while(1);
+//	}
+//	if (!sim_connect_server(Server)){
+//		while(1);	//Sim can't connect to server.
+//	}
+//	for(int i=0;i<10;i++){
+//	sim_send_message("This is test Message \r\n");
+//	};
+//	if (!sim_disconnect_server(Server))
+//	{
+//		while(1);
+//	}
 	while(1)
 	{
 			if (gps_read_data()){

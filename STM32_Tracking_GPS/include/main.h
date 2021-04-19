@@ -13,6 +13,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "diag/Trace.h"
 #include "stm32f10x.h"
 #include "port_pin.h"

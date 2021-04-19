@@ -140,7 +140,7 @@ void usart_init()
 #endif
 	usart_nvic_init();
 }
-void USART1_Send_String(uint8_t *str)
+void USART1_Send_String(char *str)
 {
 	while(*str)
 	{
