@@ -3,13 +3,13 @@
 #include "usart/usart.h"
 volatile uint32_t msTicks=0;
 volatile uint32_t myTicks_tim4=0;
-extern __IO uint8_t RxBuffer1[];
+extern __IO char RxBuffer1[];
 extern __IO uint8_t RxCounter1;
 
-extern __IO uint8_t RxBuffer5[];
+extern __IO char RxBuffer5[];
 extern __IO uint8_t RxCounter5;
 
-extern __IO uint8_t RxBuffer4[];
+extern __IO char RxBuffer4[];
 extern __IO uint8_t RxCounter4;
 extern __IO uint8_t flagStart,flagStop;
 void NMI_Handler(void)
@@ -78,12 +78,11 @@ void UART4_IRQHandler(void)
 }
 void USART1_IRQHandler(void)
 {
-	uint16_t c;
+	char c;
 	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
 	{
-//		c = USART_ReceiveData(USART1);
-//		if (RxCounter1<BUFFER_SIZE1) RxBuffer1[RxCounter1++]=c;
-//		else RxCounter1 = 0;
-		Sim800_RxCallBack();
+		c = USART_ReceiveData(USART1);
+		if (RxCounter1<BUFFER_SIZE1) RxBuffer1[RxCounter1++]=c;
+		else RxCounter1 = 0;
 	}
 }

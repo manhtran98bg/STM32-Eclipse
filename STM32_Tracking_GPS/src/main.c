@@ -7,7 +7,6 @@
 #include "usart/usart.h"
 #include "rfid/mfrc552.h"
 #include "gps/gps.h"
-#include "mqtt/MQTTSim800.h"
 // ----------------------------------------------------------------------------
 
 #pragma GCC diagnostic push
@@ -17,35 +16,25 @@
 
 // ----------------------------------------------------------------------------
 dht11_data data;
-//extern uint8_t RxBuffer[];
-//extern __IO uint8_t RxBuffer1[];
-//extern __IO uint8_t RxCounter1;
-//
-//extern __IO uint8_t RxBuffer5[];
-//extern __IO uint8_t RxCounter5;
-//
-//extern __IO uint8_t RxBuffer4[];
-//extern __IO uint8_t RxCounter4;
-SIM800_t SIM800;
-
 u8 status;
 u8 str[16]; // Max_LEN = 16
-const char IP_Address[15]="118.68.132.242";
-//const char IP_Address[15]="google.com.vn";
-const char Port[5]="8080";
+const char IP_Address[]="11247f7ffbf04962859c1bbd167dc340.s1.eu.hivemq.cloud";
+uint16_t port=8883;
 uchar serNum[5];
+SIM800_t *sim800;
+sim_t	*sim_APN;
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
-
 static void user_led_init();
 static void user_led_toggle();
 static void tim4_init();
 static void clk_init();
+void init_var(SIM800_t* sim800);
+
 int main(int argc, char* argv[])
  {
-	server *Server=(server*)malloc(sizeof(server));
-	Server->IP = (char*)IP_Address;
-	Server->Port = (char*)Port;
+	sim800=(SIM800_t*)malloc(sizeof(SIM800_t));
+	init_var(sim800);
 	clk_init();
 	SystemCoreClockUpdate();
 	SysTick_Config(SystemCoreClock/1000);
@@ -61,22 +50,22 @@ int main(int argc, char* argv[])
 	{
 		while(1);	// Sim can't start because no Power.
 	}
-	MQTT_Init();
-//	if (!sim_init())
-//	{
-//		while(1);	//Sim can't init, check log.
-//	}
-//	if (!sim_set_TCP_connection())
-//	{
-//		while(1);
-//	}
-//	if (!sim_connect_server(Server)){
-//		while(1);	//Sim can't connect to server.
-//	}
+	if (!sim_init(sim800))
+	{
+		while(1);	//Sim can't init, check log.
+	}
+	if (!sim_set_TCP_connection())
+	{
+		while(1);
+	}
+	if (!sim_connect_server(sim800)){
+		while(1);	//Sim can't connect to server.
+	}
+	MQTT_connect(sim800);
 //	for(int i=0;i<10;i++){
-//	sim_send_message("This is test Message \r\n");
+//	sim_send_message((char*)"This is test Message \r\n");
 //	};
-//	if (!sim_disconnect_server(Server))
+//	if (!sim_disconnect_server(sim800))
 //	{
 //		while(1);
 //	}
@@ -110,6 +99,21 @@ int main(int argc, char* argv[])
 //		delay_ms(1000);
 	}
 	return 0;
+}
+void init_var(SIM800_t* sim800)
+{
+	sim_APN=(sim_t*)malloc(sizeof(sim_t));
+	sim_APN->apn = "m-wap";
+	sim_APN->apn_user = "mms";
+	sim_APN->apn_pass = "mms";
+	sim800->sim = sim_APN;
+	sim800->mqttServer.host = (char*)IP_Address;
+	sim800->mqttServer.port = port;
+	sim800->mqttServer.connect = false;
+	sim800->mqttClient.username = "tranmmanh";
+	sim800->mqttClient.pass = "thethoiA11";
+	sim800->mqttClient.clientID = "TestSub";
+	sim800->mqttClient.keepAliveInterval = 120;
 }
 static void user_led_init()
 {
