@@ -8,6 +8,7 @@
 #include "../service/delay.h"
 #include "../usart/usart.h"
 extern __IO char RxBuffer1[];
+char buffer[128]={0};
 void sim_gpio_init()
 {
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
@@ -100,7 +101,7 @@ void sim_power_off()
 #endif
 	}
 }
-static void sim_send_cmd(char* cmd, uint16_t ms)
+void sim_send_cmd(char* cmd, uint16_t ms)
 {
 #if _DEBUG && _DEBUG_AT_CMD	//Gui len CMD ra man hinh debug
 	trace_puts((char*)cmd);
@@ -212,9 +213,9 @@ static uint8_t sim_attach_gprs()
 	u8 time_out=0;
 	u8 r=0;
 	time_out = 0;
-	sim_send_cmd((char*)"AT+CIPCLOSE=1\r\n", 1000);
+//	sim_send_cmd((char*)"AT+CIPCLOSE=1\r\n", 1000);
 	do{
-		sim_send_cmd((char*)"AT+CGATT=1\r\n", 1000);
+		sim_send_cmd((char*)"AT+CGATT=1\r\n", 2000);
 		r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
 		time_out++;
 	}while ((time_out<20)&&(!r));
@@ -337,19 +338,22 @@ uint8_t sim_init(SIM800_t *sim800)
 	if (!sim_check_response()) return 0;
 	if (!sim_check_simcard()) return 0;
 	if (!sim_check_reg()) return 0;
+	sim_send_cmd((char*)"AT+CSQ\r\n", 1000);
+	sim_send_cmd((char*)"AT+COP?\r\n", 1000);
 	if (!sim_attach_gprs()) return 0;
 	if (!sim_set_APN(sim800->sim)) return 0;
 	return 1;
 }
 
-uint8_t sim_send_message(char* message)
+uint8_t sim_send_message(unsigned char* message, uint8_t datalen)
 {
 	u8 time_out=0;
 	u8 r=0;
 	sim_send_cmd((char*)"AT+CIPSEND\r\n", 200);
-	USART_SendData(USART1, 0x10);
-	USART1_Send_String((char*)message);
+	USART1_Send_Array(message, datalen);
+	UART5_Send_Array(message, datalen);
 	USART_SendData(USART1, 0x1A);
+	USART_SendData(UART5, 0x1A);
 	do{
 		r = sim_check_cmd((char*)RxBuffer1, (char*)"SEND OK\r\n");
 		time_out++;
@@ -375,12 +379,13 @@ uint8_t sim_connect_server(SIM800_t *sim800)
 	sim_log((char*)buff);
 	memset(buff,0,60);
 	sprintf((char*)buff,"AT+CIPSTART=\"TCP\",\"%s\",\"%d\"\r\n",sim800->mqttServer.host,sim800->mqttServer.port);
+	sim_send_cmd((char*)buff, 2000);
 	time_out = 0;
 	do{
-		sim_send_cmd((char*)buff, 4000);
 		r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n\r\nCONNECT OK");
+		delay_ms(100);
 		time_out++;
-	}while ((time_out<5)&&(!r));
+	}while ((time_out<50)&&(!r));
 	if (time_out>=5){
 		memset(buff,0,60);
 		sprintf((char*)buff,"Connecting to: %s:%d: FAILED",sim800->mqttServer.host,sim800->mqttServer.port);
@@ -393,6 +398,7 @@ uint8_t sim_connect_server(SIM800_t *sim800)
 	sim800->mqttServer.connect = true;
 	sim800->simState = sim_current_connection_status();
 	sim_log((char*)buff);
+	free(buff);
 	return 1;
 }
 state sim_current_connection_status()
@@ -433,8 +439,19 @@ void MQTT_connect(SIM800_t *sim800){
 		datas.clientID.cstring = sim800->mqttClient.clientID;
 		datas.keepAliveInterval = sim800->mqttClient.keepAliveInterval;
 		datas.cleansession = 1;
-		int mqtt_len = MQTTSerialize_connect(buf, sizeof(buf), &datas);
-		sim_send_cmd((char*)buf, 2000);
+		int data_len = MQTTSerialize_connect(buf, sizeof(buf), &datas);
+		sim_send_message((unsigned char*)buf,data_len);
 	}
 }
+void MQTT_Pub(char *topic, char *payload) {
+    unsigned char buf[256] = {0};
+
+    MQTTString topicString = MQTTString_initializer;
+    topicString.cstring = topic;
+
+    int data_len = MQTTSerialize_publish(buf, sizeof(buf), 0, 0, 0, 0,
+                                         topicString, (unsigned char *) payload, (int) strlen(payload));
+    sim_send_message((unsigned char*)buf,data_len);
+}
+
 

@@ -41,7 +41,9 @@
 
 void usart_init();
 void USART1_Send_String(char *str);
+void USART1_Send_Array(unsigned char *str, uint8_t length);
 void UART5_Send_String(char *str);
+void UART5_Send_Array(unsigned char *str, uint8_t length);
 void UART4_Send_String(char *str);
 void USART_clear_buf(uint8_t USARTx);
 #endif /* USART_USART_H_ */

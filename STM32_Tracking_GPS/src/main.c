@@ -18,11 +18,18 @@
 dht11_data data;
 u8 status;
 u8 str[16]; // Max_LEN = 16
-const char IP_Address[]="11247f7ffbf04962859c1bbd167dc340.s1.eu.hivemq.cloud";
-uint16_t port=8883;
+//const char IP_Address[]="11247f7ffbf04962859c1bbd167dc340.s1.eu.hivemq.cloud";
+const char IP_Address[]="broker.hivemq.com";
+uint16_t port=1883;
 uchar serNum[5];
 SIM800_t *sim800;
 sim_t	*sim_APN;
+__IO uint8_t flagRx5 = 0;
+
+
+extern __IO char RxBuffer5[];
+extern __IO char RxBuffer1[];
+extern __IO uint8_t RxCounter5;
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 static void user_led_init();
@@ -62,18 +69,28 @@ int main(int argc, char* argv[])
 		while(1);	//Sim can't connect to server.
 	}
 	MQTT_connect(sim800);
+	delay_ms(500);
+	sim_current_connection_status();
+	MQTT_Pub((char*)"testtopic/1", "123");
 //	for(int i=0;i<10;i++){
 //	sim_send_message((char*)"This is test Message \r\n");
 //	};
-//	if (!sim_disconnect_server(sim800))
-//	{
-//		while(1);
-//	}
+	if (!sim_disconnect_server(sim800))
+	{
+		while(1);
+	}
 	while(1)
 	{
-			if (gps_read_data()){
-				user_led_toggle();
-			}
+		if (flagRx5)
+		{
+			trace_printf(RxBuffer5);
+			flagRx5 = 0;
+			sim_send_cmd(RxBuffer5, 1000);
+			USART_clear_buf(5);
+		}
+//			if (gps_read_data()){
+//				user_led_toggle();
+//			}
 //		status = MFRC522_Request(PICC_REQIDL, str);
 //				if (status == MI_OK)
 //				{
@@ -110,8 +127,8 @@ void init_var(SIM800_t* sim800)
 	sim800->mqttServer.host = (char*)IP_Address;
 	sim800->mqttServer.port = port;
 	sim800->mqttServer.connect = false;
-	sim800->mqttClient.username = "tranmmanh";
-	sim800->mqttClient.pass = "thethoiA11";
+	sim800->mqttClient.username = "user";
+	sim800->mqttClient.pass = "user";
 	sim800->mqttClient.clientID = "TestSub";
 	sim800->mqttClient.keepAliveInterval = 120;
 }

@@ -11,7 +11,9 @@ extern __IO uint8_t RxCounter5;
 
 extern __IO char RxBuffer4[];
 extern __IO uint8_t RxCounter4;
+
 extern __IO uint8_t flagStart,flagStop;
+extern __IO uint8_t	flagRx5;
 void NMI_Handler(void)
 {
 
@@ -48,10 +50,18 @@ void TIM4_IRQHandler(void)
 }
 void UART5_IRQHandler(void)
 {
+	char c;
 	if(USART_GetITStatus(UART5, USART_IT_RXNE) != RESET)
 	{
-		if (RxCounter5<64) RxBuffer5[RxCounter5++]=USART_ReceiveData(UART5);
-		else RxCounter5 = 0;
+		c = (char)USART_ReceiveData(UART5);
+		if (c=='\n') {
+			flagRx5 = 1;
+			RxBuffer5[RxCounter5++] = c;
+		}
+		else {
+			if (RxCounter5<64) RxBuffer5[RxCounter5++]=USART_ReceiveData(UART5);
+			else RxCounter5 = 0;
+		}
 	}
 }
 void UART4_IRQHandler(void)

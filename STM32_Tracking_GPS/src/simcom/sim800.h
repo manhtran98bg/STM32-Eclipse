@@ -12,7 +12,7 @@
 #include "../mqtt/MQTTPacket.h"
 #define _DEBUG_AT_CMD 1
 #define _DEBUG_SIM_UART5	1
-#define _DEBUG_AT_UART5	0
+#define _DEBUG_AT_UART5	1
 typedef enum {
 	IP_INITIAL,
 	IP_START,
@@ -69,10 +69,13 @@ typedef struct {
 void sim_gpio_init();
 uint8_t sim_power_on();
 void sim_power_off();
+void sim_send_cmd(char* cmd, uint16_t ms);
 uint8_t sim_init(SIM800_t *sim800);
 uint8_t sim_connect_server(SIM800_t *sim800);
 uint8_t sim_disconnect_server(SIM800_t *sim800);
 uint8_t sim_set_TCP_connection();
-uint8_t sim_send_message(char* message);
+uint8_t sim_send_message(unsigned char* message, uint8_t datalen);
 state sim_current_connection_status();
+void MQTT_Pub(char *topic, char *payload);
+void MQTT_connect(SIM800_t *sim800);
 #endif /* SIMCOM_SIM800_H_ */
