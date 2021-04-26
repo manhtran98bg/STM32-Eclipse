@@ -13,7 +13,7 @@ extern __IO char RxBuffer4[];
 extern __IO uint8_t RxCounter4;
 
 extern __IO uint8_t flagStart,flagStop;
-extern __IO uint8_t	flagRx5;
+__IO uint8_t	flagRx5 = 0 ;
 void NMI_Handler(void)
 {
 

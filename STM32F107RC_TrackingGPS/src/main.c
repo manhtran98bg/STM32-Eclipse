@@ -47,7 +47,7 @@ int main(int argc, char* argv[])
 	sim_gpio_init();
 	sim_power_off();
 	usart_init();
-//	MFRC522_Init();
+	MFRC522_Init();
 	gps_init();
 	if	(!sim_power_on())
 	{
