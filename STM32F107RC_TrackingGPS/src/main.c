@@ -18,19 +18,16 @@
 dht11_data data;
 u8 status;
 u8 str[16]; // Max_LEN = 16
-//const char IP_Address[]="11247f7ffbf04962859c1bbd167dc340.s1.eu.hivemq.cloud";
+// Khai bao cac bien cho SIM800 && MQTT broker
 const char IP_Address[]="broker.hivemq.com";
-//const char IP_Address[]="118.68.132.242";
 uint16_t port=1883;
-uchar serNum[5];
 SIM800_t *sim800;
 sim_t	*sim_APN;
-__IO uint8_t flagRx5 = 0;
 char mqttBuffer[128]={0};
 
-extern __IO char RxBuffer5[];
-extern __IO char RxBuffer1[];
-extern __IO uint8_t RxCounter5;
+uchar serNum[5];
+
+
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 static void user_led_init();
@@ -137,7 +134,6 @@ static void user_led_init()
 }
 static void user_led_toggle()
 {
-	//GPIOA->ODR ^=USER_LED;
 	GPIO_SetBits(GPIOA, USER_LED);
 	dUS_tim4(50000);
 	GPIO_ResetBits(GPIOA, USER_LED);
