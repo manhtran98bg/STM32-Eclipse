@@ -151,7 +151,7 @@ void USART1_Send_String(char *str)
 }
 void USART1_Send_Array(unsigned char *str, uint8_t length)
 {
-	for(int i=0;i<=length;i++)
+	for(int i=0;i<length;i++)
 	{
 		while(USART_GetFlagStatus(USART1,USART_FLAG_TXE) == RESET);
 		USART_SendData(USART1,*(str+i));
@@ -168,7 +168,7 @@ void UART5_Send_String(char *str)
 }
 void UART5_Send_Array(unsigned char *str, uint8_t length)
 {
-	for(int i=0;i<=length;i++)
+	for(int i=0;i<length;i++)
 	{
 		while(USART_GetFlagStatus(UART5,USART_FLAG_TXE) == RESET);
 		USART_SendData(UART5,*(str+i));
