@@ -3,17 +3,15 @@
 #include "usart/usart.h"
 volatile uint32_t msTicks=0;
 volatile uint32_t myTicks_tim4=0;
-extern __IO char RxBuffer1[];
-extern __IO uint8_t RxCounter1;
-
+uint32_t uwTick=0;
 extern __IO char RxBuffer5[];
 extern __IO uint8_t RxCounter5;
 
 extern __IO char RxBuffer4[];
 extern __IO uint8_t RxCounter4;
-
+extern char mqttTxBuffer[];
 extern __IO uint8_t flagStart,flagStop;
-__IO uint8_t	flagRx5 = 0 ;
+bool flagRx5=0;
 void NMI_Handler(void)
 {
 
@@ -36,6 +34,7 @@ void PendSV_Handler(void)
 }
 void SysTick_Handler(void)
 {
+	uwTick++;
 	if(msTicks !=0)
 	{
 		msTicks--;
@@ -48,6 +47,15 @@ void TIM4_IRQHandler(void)
 		TIM_ClearFlag(TIM4, TIM_FLAG_Update);
 	}
 }
+
+void TIM5_IRQHandler(void)
+{
+	if(TIM_GetITStatus(TIM5, TIM_IT_Update)!=RESET)
+	{
+		TIM_ClearFlag(TIM5, TIM_FLAG_Update);
+	}
+}
+
 void UART5_IRQHandler(void)
 {
 	char c;
@@ -63,10 +71,12 @@ void UART5_IRQHandler(void)
 			else RxCounter5 = 0;
 		}
 	}
+
 }
 void UART4_IRQHandler(void)
 {
 	uint8_t c;
+#if !_USE_DMA
 	if(USART_GetITStatus(UART4, USART_IT_RXNE) != RESET)
 	{
 		c = USART_ReceiveData(UART4);
@@ -85,14 +95,32 @@ void UART4_IRQHandler(void)
 		}
 
 	}
+#else
+	if (USART_GetITStatus(UART4, USART_IT_IDLE)!=RESET)
+	{
+		DMA_Receive_Datapack();
+		trace_puts("IDLE");
+	}
+#endif
+}
+void DMA2_Channel3_IRQHandler()
+{
+
 }
 void USART1_IRQHandler(void)
 {
-	char c;
 	if(USART_GetITStatus(USART1, USART_IT_RXNE) != RESET)
 	{
-		c = USART_ReceiveData(USART1);
-		if (RxCounter1<BUFFER_SIZE1) RxBuffer1[RxCounter1++]=c;
-		else RxCounter1 = 0;
+		Sim800_RxCallBack();
+	}
+}
+void RTC_IRQHandler(void)
+{
+	if (RTC_GetITStatus(RTC_IT_SEC) != RESET)
+	{
+		/* Clear the RTC Second interrupt */
+		RTC_ClearITPendingBit(RTC_IT_SEC);
+	    /* Wait until last write operation on RTC registers has finished */
+	    RTC_WaitForLastTask();
 	}
 }

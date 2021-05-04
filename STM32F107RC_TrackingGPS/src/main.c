@@ -7,6 +7,7 @@
 #include "usart/usart.h"
 #include "rfid/mfrc552.h"
 #include "gps/gps.h"
+#include "rtc/rtc.h"
 // ----------------------------------------------------------------------------
 
 #pragma GCC diagnostic push
@@ -23,65 +24,97 @@ const char IP_Address[]="broker.hivemq.com";
 uint16_t port=1883;
 SIM800_t *sim800;
 sim_t	*sim_APN;
-char mqttBuffer[128]={0};
-
+RMC_Data *RMC;
+RTC_Time_t Time;
+MQTTString topicString[3] = MQTTString_initializer;
+//char RMC_test[]="$GPRMC,013732.000,A,3150.7238,N,11711.7278,E,10.34,0.00,220413,,,A*68\r\n";
+int requestedQoSs[3]={0,0,0};
 uchar serNum[5];
-
-
+char mqttTxBuffer[128]={0};
+uint32_t t_check_connection = 0;
+#define _USE_SIM	1
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 static void user_led_init();
 static void user_led_toggle();
 static void tim4_init();
+static void tim5_init();
 static void clk_init();
+static void board_init();
 void init_var(SIM800_t* sim800);
-
 int main(int argc, char* argv[])
- {
+{
+	unsigned char *topic=(unsigned char*)calloc(64,sizeof(unsigned char));
+	unsigned char *payload=(unsigned char*)calloc(256,sizeof(unsigned char));
 	sim800=(SIM800_t*)malloc(sizeof(SIM800_t));
+	RMC = (RMC_Data*)malloc(sizeof(RMC_Data));
+	topicString[0].cstring = (char*)"testtopic/Rx1";
+	topicString[1].cstring = (char*)"testtopic/Rx2";
+	topicString[2].cstring = (char*)"testtopic/Rx3";
 	init_var(sim800);
-	clk_init();
-	power_reset_sim();
-	user_led_init();
-	tim4_init();
-	sim_gpio_init();
-	sim_power_off();
-	usart_init();
-	MFRC522_Init();
-	gps_init();
-	if	(!sim_power_on())
-	{
-		while(1);	// Sim can't start because no Power.
-	}
-	if (!sim_init(sim800))
-	{
-		while(1);	//Sim can't init, check log.
-	}
-	if (!sim_set_TCP_connection())
-	{
-		while(1);
-	}
-	if (!sim_connect_server(sim800)){
-		while(1);	//Sim can't connect to server.
+	board_init();
+#if _USE_SIM
+	if (sim800->power_state == ON) {
+		sim_init(sim800);
+		sim_set_TCP_connection();
+		sim_connect_server(sim800,10,5000);
 	}
 	MQTT_connect(sim800);
-	for(int i=0;i<3;i++){
-		sprintf(mqttBuffer,"Count I=%d",i);
-		MQTT_Pub((char*)"testtopic/1", mqttBuffer);
-	};
-	if (!sim_disconnect_server(sim800))
-	{
-		while(1);
-	}
-	if (!sim_detach_gprs(sim800))
-	{
-		while(1);
-	}
+	MQTT_Pub((char*)"testtopic/Tx1",(char*) "Testmesage");
+	delay_ms(500);
+	MQTT_Sub(topicString, requestedQoSs,3);
+	delay_ms(500);
+	t_check_connection = millis();
+#endif
 	while(1)
 	{
-//			if (gps_read_data()){
-//				user_led_toggle();
-//			}
+#if _USE_SIM
+		if (millis()- t_check_connection >=10000)
+		{
+			t_check_connection = millis();
+#if _DEBUG_UART5
+			UART5_Send_String((char*)"Check connection with MQTT Broker");
+			UART5_Send_String("\n");
+#endif
+			if (MQTT_PingReq(sim800)==0){
+#if _DEBUG_UART5
+				UART5_Send_String((char*)"Reconnecting...");
+				UART5_Send_String("\n");
+#endif
+				if (sim_current_connection_status()==CONNECT_OK) {
+					sim_disconnect_server(sim800);
+					sim_connect_server(sim800,10,5000);
+					MQTT_connect(sim800);
+				}
+				else if (sim_current_connection_status()== TCP_CLOSED)
+				{
+					sim_connect_server(sim800,10,5000);
+					MQTT_connect(sim800);
+				}
+			}
+		}
+		if (sim800->mqttReceive.newEvent==1)
+		{
+			topic = sim800->mqttReceive.topic;
+			payload = (sim800->mqttReceive.payload);
+			sim800->mqttReceive.newEvent = 0;
+#if _DEBUG
+			trace_puts((char*)topic);
+			trace_puts((char*)payload);
+#elif _DEBUG_UART5
+			UART5_Send_String((char*)topic);
+			UART5_Send_String("\n");
+			UART5_Send_String((char*)payload);
+			UART5_Send_String("\n");
+#endif
+		}
+		else if (gps_read_data(RMC)){
+			memset(mqttTxBuffer,0,sizeof(mqttTxBuffer));
+			sprintf(mqttTxBuffer,"Time:%d:%d:%d Date:%d:%d:%d",RMC->Time.hh,RMC->Time.mm,RMC->Time.ss,
+															   RMC->Date.day,RMC->Date.month,RMC->Date.year);
+			MQTT_Pub((char*)"testtopic/Tx1",(char*) mqttTxBuffer);
+		}
+#endif
 //		status = MFRC522_Request(PICC_REQIDL, str);
 //				if (status == MI_OK)
 //				{
@@ -120,8 +153,23 @@ void init_var(SIM800_t* sim800)
 	sim800->mqttServer.connect = false;
 	sim800->mqttClient.username = "user";
 	sim800->mqttClient.pass = "user";
-	sim800->mqttClient.clientID = "TestSub";
+	sim800->mqttClient.clientID = "Client01";
 	sim800->mqttClient.keepAliveInterval = 120;
+	sim800->power_state = OFF;
+}
+static void board_init()
+{
+	clk_init();
+	RTC_Init();
+	user_led_init();
+	tim4_init();
+	power_reset_sim();
+	sim_gpio_init();
+	sim_power_off(sim800);
+	usart_init();
+	MFRC522_Init();
+	gps_init();
+	sim_power_on(sim800);
 }
 static void user_led_init()
 {
@@ -134,9 +182,7 @@ static void user_led_init()
 }
 static void user_led_toggle()
 {
-	GPIO_SetBits(GPIOA, USER_LED);
-	dUS_tim4(50000);
-	GPIO_ResetBits(GPIOA, USER_LED);
+	GPIOA->ODR ^=(uint32_t)(USER_LED);
 }
 /*	TIMER 4 Config 1uS, SysClock = 72Mhz
  * 	Prescaler = 71
@@ -151,6 +197,20 @@ static void tim4_init()
 	TIM_TimeBaseInitStruct.TIM_Period = 0xffff-1;
 	TIM_TimeBaseInit(TIM4,&TIM_TimeBaseInitStruct);
 	TIM_ClearFlag(TIM4, TIM_FLAG_Update);
+}
+static void tim5_init()
+{
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM5, ENABLE);
+	TIM_TimeBaseInitTypeDef TIM_TimeBaseInitStruct;
+	TIM_TimeBaseInitStruct.TIM_CounterMode = TIM_CounterMode_Up;
+	TIM_TimeBaseInitStruct.TIM_ClockDivision = 0;
+	TIM_TimeBaseInitStruct.TIM_Prescaler = 7199;
+	TIM_TimeBaseInitStruct.TIM_Period = 40000;
+	TIM_TimeBaseInit(TIM5,&TIM_TimeBaseInitStruct);
+	TIM_ClearFlag(TIM5, TIM_FLAG_Update);
+	TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);
+	NVIC_EnableIRQ(TIM5_IRQn);
+	TIM_Cmd(TIM5, ENABLE);
 }
 static void clk_init()
 {

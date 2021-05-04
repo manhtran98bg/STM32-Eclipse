@@ -13,6 +13,7 @@
 #define _DEBUG_AT_CMD 0
 #define _DEBUG_SIM_UART5	1
 #define _DEBUG_AT_UART5	0
+#define QoS	0
 typedef enum {
 	IP_INITIAL,
 	IP_START,
@@ -27,6 +28,10 @@ typedef enum {
 	DEFAUT
 }state;
 
+typedef enum {
+	OFF,
+	ON
+}pwr_state;
 typedef struct {
     char *apn;
     char *apn_user;
@@ -52,7 +57,7 @@ typedef struct {
     int qos;
     unsigned char retained;
     unsigned short msgId;
-    unsigned char payload[64];
+    unsigned char payload[256];
     int payloadLen;
     unsigned char topic[64];
     int topicLen;
@@ -64,19 +69,23 @@ typedef struct {
     mqttClient_t mqttClient;
     mqttReceive_t mqttReceive;
     state	simState;
+	pwr_state power_state;
 } SIM800_t;
 
 void sim_gpio_init();
-uint8_t sim_power_on();
-void sim_power_off();
+uint8_t sim_power_on(SIM800_t *sim800);
+void sim_power_off(SIM800_t *sim800);
 void sim_send_cmd(char* cmd, uint16_t ms);
 uint8_t sim_init(SIM800_t *sim800);
-uint8_t sim_connect_server(SIM800_t *sim800);
+uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms);
 uint8_t sim_disconnect_server(SIM800_t *sim800);
-uint8_t sim_detach_gprs(SIM800_t *sim800);
+uint8_t sim_attach_gprs(char num_try, int timeout_ms);
+uint8_t sim_detach_gprs(char num_try, int timeout_ms);
 uint8_t sim_set_TCP_connection();
 uint8_t sim_send_message(unsigned char* message, uint8_t datalen);
 state sim_current_connection_status();
 void MQTT_Pub(char *topic, char *payload);
+void MQTT_Sub(MQTTString *topicString, int *requestedQoSs, int topic_count) ;
 void MQTT_connect(SIM800_t *sim800);
+uint8_t MQTT_PingReq(SIM800_t *sim800);
 #endif /* SIMCOM_SIM800_H_ */

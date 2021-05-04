@@ -14,8 +14,7 @@ __IO uint8_t RxCounter5=0;
 
 __IO char RxBuffer4[BUFFER_SIZE4];
 __IO uint8_t RxCounter4=0;
-uint8_t RxBuffer[1024];
-
+uint8_t dmaRxbuffer[512]={0};
 static void usart_clk_init(void);
 static void usart_gpio_init(void);
 static void usart_module_init(void);
@@ -66,7 +65,7 @@ static void usart_module_init(void)
 	/* Baud rate 9600, 8-bit data, One stop bit
 	* No parity, Do both Rx and Tx, No HW flow control
 	*/
-	usart_init_structure.USART_BaudRate = 9600;
+	usart_init_structure.USART_BaudRate = 115200;
 	usart_init_structure.USART_Mode = USART_Mode_Tx|USART_Mode_Rx;
 	usart_init_structure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
 	usart_init_structure.USART_Parity = USART_Parity_No;
@@ -81,6 +80,7 @@ static void usart_module_init(void)
 #if _USE_DMA
 	/* UART4 with DMA2 Channel 3 */
 	USART_DMACmd(UART4, USART_DMAReq_Rx, ENABLE);
+	USART_ITConfig(UART4, USART_IT_IDLE, ENABLE);
 #else
 	USART_ITConfig(UART4, USART_IT_RXNE, ENABLE);
 #endif
@@ -98,17 +98,18 @@ static void usart_nvic_init(void)
 	nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
 	nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 1;
 	NVIC_Init(&nvic_init_structure);
-#if !_USE_DMA
 	nvic_init_structure.NVIC_IRQChannel = UART4_IRQn;
 	nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
 	nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 2;
 	NVIC_Init(&nvic_init_structure);
-#endif
 
 	nvic_init_structure.NVIC_IRQChannel = UART5_IRQn;
 	nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
 	nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 3;
 	NVIC_Init(&nvic_init_structure);
+#if _USE_DMA
+	NVIC_EnableIRQ(DMA2_Channel3_IRQn);
+#endif
 }
 static void uart4_dma_init()
 {
@@ -116,10 +117,10 @@ static void uart4_dma_init()
 	RCC_AHBPeriphClockCmd(RCC_AHBPeriph_DMA2, ENABLE);
 	DMA_DeInit(DMA2_Channel3);
 	DMA_InitStructure.DMA_PeripheralBaseAddr = (uint32_t)&UART4->DR;
-	DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)RxBuffer;
+	DMA_InitStructure.DMA_MemoryBaseAddr = (uint32_t)dmaRxbuffer;
 	DMA_InitStructure.DMA_DIR = DMA_DIR_PeripheralSRC;
 	DMA_InitStructure.DMA_Mode = DMA_Mode_Circular;
-	DMA_InitStructure.DMA_BufferSize = 1024;
+	DMA_InitStructure.DMA_BufferSize = 512;
 
 	DMA_InitStructure.DMA_PeripheralInc = DMA_PeripheralInc_Disable;
 	DMA_InitStructure.DMA_MemoryInc = DMA_MemoryInc_Enable;
@@ -148,6 +149,11 @@ void USART1_Send_String(char *str)
 		USART_SendData(USART1,*str);
 		str++;
 	}
+}
+void USART1_Send_Char(char chr)
+{
+	while(USART_GetFlagStatus(USART1,USART_FLAG_TXE) == RESET);
+	USART_SendData(USART1,chr);
 }
 void USART1_Send_Array(unsigned char *str, uint8_t length)
 {

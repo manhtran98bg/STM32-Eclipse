@@ -9,7 +9,7 @@
 #define USART_USART_H_
 #include "main.h"
 #define _USE_DMA	0
-#define BUFFER_SIZE1	128
+#define BUFFER_SIZE1	1460
 #define BUFFER_SIZE4	128
 #define BUFFER_SIZE5	128
 
@@ -41,6 +41,7 @@
 
 void usart_init();
 void USART1_Send_String(char *str);
+void USART1_Send_Char(char chr);
 void USART1_Send_Array(unsigned char *str, uint8_t length);
 void UART5_Send_String(char *str);
 void UART5_Send_Array(unsigned char *str, uint8_t length);

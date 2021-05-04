@@ -213,16 +213,16 @@ void PWR_EnterSTOPMode(uint32_t PWR_Regulator, uint8_t PWR_STOPEntry)
   SCB->SCR |= SCB_SCR_SLEEPDEEP;
   
   /* Select STOP mode entry --------------------------------------------------*/
-  if(PWR_STOPEntry == PWR_STOPEntry_WFI)
-  {   
-    /* Request Wait For Interrupt */
-    __WFI();
-  }
-  else
-  {
-    /* Request Wait For Event */
-    __WFE();
-  }
+//  if(PWR_STOPEntry == PWR_STOPEntry_WFI)
+//  {
+//    /* Request Wait For Interrupt */
+//    __WFI();
+//  }
+//  else
+//  {
+//    /* Request Wait For Event */
+//    __WFE();
+//  }
   
   /* Reset SLEEPDEEP bit of Cortex System Control Register */
   SCB->SCR &= (uint32_t)~((uint32_t)SCB_SCR_SLEEPDEEP);  
