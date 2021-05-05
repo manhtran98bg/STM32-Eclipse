@@ -40,6 +40,7 @@ static void user_led_toggle();
 static void tim4_init();
 static void tim5_init();
 static void clk_init();
+static void btn_init();
 static void board_init();
 void init_var(SIM800_t* sim800);
 int main(int argc, char* argv[])
@@ -59,7 +60,7 @@ int main(int argc, char* argv[])
 		sim_set_TCP_connection();
 		sim_connect_server(sim800,10,5000);
 	}
-	MQTT_connect(sim800);
+	MQTT_Connect(sim800);
 	MQTT_Pub((char*)"testtopic/Tx1",(char*) "Testmesage");
 	delay_ms(500);
 	MQTT_Sub(topicString, requestedQoSs,3);
@@ -84,12 +85,12 @@ int main(int argc, char* argv[])
 				if (sim_current_connection_status()==CONNECT_OK) {
 					sim_disconnect_server(sim800);
 					sim_connect_server(sim800,10,5000);
-					MQTT_connect(sim800);
+					MQTT_Connect(sim800);
 				}
 				else if (sim_current_connection_status()== TCP_CLOSED)
 				{
 					sim_connect_server(sim800,10,5000);
-					MQTT_connect(sim800);
+					MQTT_Connect(sim800);
 				}
 			}
 		}
@@ -113,6 +114,10 @@ int main(int argc, char* argv[])
 			sprintf(mqttTxBuffer,"Time:%d:%d:%d Date:%d:%d:%d",RMC->Time.hh,RMC->Time.mm,RMC->Time.ss,
 															   RMC->Date.day,RMC->Date.month,RMC->Date.year);
 			MQTT_Pub((char*)"testtopic/Tx1",(char*) mqttTxBuffer);
+			memset(mqttTxBuffer,0,sizeof(mqttTxBuffer));
+			sprintf(mqttTxBuffer,"Lat:%d:%d:%d Lon:%d:%d:%d",RMC->Lat.lat_dd,RMC->Lat.lat_mm,RMC->Lat.lat_mmmm,
+															 RMC->Lon.lon_ddd,RMC->Lon.lon_mm,RMC->Lon.lon_mmmm);
+			MQTT_Pub((char*)"testtopic/Tx2",(char*) mqttTxBuffer);
 		}
 #endif
 //		status = MFRC522_Request(PICC_REQIDL, str);
@@ -156,12 +161,14 @@ void init_var(SIM800_t* sim800)
 	sim800->mqttClient.clientID = "Client01";
 	sim800->mqttClient.keepAliveInterval = 120;
 	sim800->power_state = OFF;
+	sim800->tcp_connect = false;
 }
 static void board_init()
 {
 	clk_init();
 	RTC_Init();
 	user_led_init();
+	btn_init();
 	tim4_init();
 	power_reset_sim();
 	sim_gpio_init();
@@ -170,6 +177,34 @@ static void board_init()
 	MFRC522_Init();
 	gps_init();
 	sim_power_on(sim800);
+}
+static void btn_init(){
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
+	GPIO_InitTypeDef gpio_init_struct;
+	EXTI_InitTypeDef exti_init_struct;
+	NVIC_InitTypeDef nvic_init_struct;
+	gpio_init_struct.GPIO_Pin = USER_BTN1|USER_BTN2|USER_BTN3;
+	gpio_init_struct.GPIO_Mode = GPIO_Mode_IN_FLOATING;
+	GPIO_Init(GPIOB, &gpio_init_struct);
+	/* Connect EXTI12 Line to PB12 pin */
+	GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource12);
+	/* Connect EXTI13 Line to PB13 pin */
+	GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource13);
+	/* Connect EXTI14 Line to PB14 pin */
+	GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource14);
+	/* Configure EXTI line */
+	exti_init_struct.EXTI_Line = EXTI_Line12|EXTI_Line13|EXTI_Line14;
+	exti_init_struct.EXTI_Mode = EXTI_Mode_Interrupt;
+	exti_init_struct.EXTI_Trigger = EXTI_Trigger_Falling;
+	exti_init_struct.EXTI_LineCmd = ENABLE;
+	EXTI_Init(&exti_init_struct);
+	nvic_init_struct.NVIC_IRQChannel = EXTI15_10_IRQn;
+	nvic_init_struct.NVIC_IRQChannelPreemptionPriority = 0x0F;
+	nvic_init_struct.NVIC_IRQChannelSubPriority = 0x0F;
+	nvic_init_struct.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&nvic_init_struct);
+
 }
 static void user_led_init()
 {

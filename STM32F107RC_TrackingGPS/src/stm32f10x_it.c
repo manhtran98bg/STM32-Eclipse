@@ -124,3 +124,18 @@ void RTC_IRQHandler(void)
 	    RTC_WaitForLastTask();
 	}
 }
+void EXTI15_10_IRQHandler()
+{
+	if(EXTI_GetITStatus(EXTI_Line12)!=RESET)
+	{
+		 EXTI_ClearITPendingBit(EXTI_Line12);
+	}
+	if(EXTI_GetITStatus(EXTI_Line13)!=RESET)
+	{
+		 EXTI_ClearITPendingBit(EXTI_Line13);
+	}
+	if(EXTI_GetITStatus(EXTI_Line14)!=RESET)
+	{
+		 EXTI_ClearITPendingBit(EXTI_Line14);
+	}
+}

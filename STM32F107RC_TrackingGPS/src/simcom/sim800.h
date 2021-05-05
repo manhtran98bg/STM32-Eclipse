@@ -28,6 +28,14 @@ typedef enum {
 	DEFAUT
 }state;
 
+typedef enum{
+	NORESPONSE = -2,
+	NOSIGNAL,
+	MARGINAL,
+	OK,
+	GOOD,
+	EXCELLENT
+}signal_t;
 typedef enum {
 	OFF,
 	ON
@@ -68,8 +76,10 @@ typedef struct {
     mqttServer_t mqttServer;
     mqttClient_t mqttClient;
     mqttReceive_t mqttReceive;
+    pwr_state power_state;
     state	simState;
-	pwr_state power_state;
+    bool tcp_connect;
+	signal_t signal_condition;
 } SIM800_t;
 
 void sim_gpio_init();
@@ -86,6 +96,6 @@ uint8_t sim_send_message(unsigned char* message, uint8_t datalen);
 state sim_current_connection_status();
 void MQTT_Pub(char *topic, char *payload);
 void MQTT_Sub(MQTTString *topicString, int *requestedQoSs, int topic_count) ;
-void MQTT_connect(SIM800_t *sim800);
+uint8_t MQTT_Connect(SIM800_t *sim800);
 uint8_t MQTT_PingReq(SIM800_t *sim800);
 #endif /* SIMCOM_SIM800_H_ */

@@ -9,12 +9,14 @@
 #include "../usart/usart.h"
 extern __IO char RxBuffer1[];
 
-extern __IO uint8_t RxCounter1;
+extern __IO uint16_t RxCounter1;
 
 extern SIM800_t *sim800;
 bool txFlag = 0;
-bool PINGREQ_Flag = 0;
+bool PINGRESP_Flag = 0;
 bool mqtt_receive = 0;
+unsigned char CONNACK_buffer[6]={0};
+unsigned char CONNACK_index = 0;
 char mqtt_buffer[1460] = {0};
 uint16_t mqtt_index = 0;
 void sim_gpio_init()
@@ -221,6 +223,33 @@ static uint8_t sim_check_simcard(char num_try, int timeout_ms)
 	return 0;
 
 }
+signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms)
+{
+	sim_send_cmd((char*)"AT+CSQ\r\n", 50);
+	u8 time_out=0;
+	u8 r=0;
+	u8 signal = 0;
+	char *temp;
+	char signal_str[3]={0};
+	do {
+		r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
+		time_out++;
+		delay_ms(100);
+	}while ((time_out<(timeout_ms/100))&&(!r));
+	if (time_out>=(timeout_ms/100)) return NORESPONSE;
+	temp = strstr((char*)RxBuffer1,(char*)"+CSQ:");
+	if (temp!=NULL)
+	{
+		signal_str[0]=*(temp+6);
+		signal_str[1]=*(temp+7);
+		if (atoi(signal_str)!=0) signal = atoi(signal_str);
+	}
+	if (signal<2) return NOSIGNAL;
+	if ((signal>=2)&&(signal<=9)) return MARGINAL;
+	if ((signal>=10)&&(signal<=14)) return OK;
+	if ((signal>=15)&&(signal<=19)) return GOOD;
+	if ((signal>=20)&&(signal<=30)) return EXCELLENT;
+}
 /*	Check SIM registration status
  * 	Send AT+CREG? Command
  * 	Response +CREG: 0,1
@@ -412,10 +441,12 @@ uint8_t sim_init(SIM800_t *sim800)
 	if (!sim_check_response(max_try, time_out_ms)) return 0;
 	if (!sim_check_simcard(max_try, time_out_ms)) return 0;
 	if (!sim_check_reg(max_try, time_out_ms)) return 0;
-	sim_send_cmd((char*)"AT+CSQ\r\n", 1000);
+	sim800->signal_condition=sim_check_signal_condition(sim800, 1000);
 	if (!sim_attach_gprs(max_try, time_out_ms)) return 0;
 	if (!sim_set_APN(sim800->sim,max_try,time_out_ms)) return 0;
 	sim_send_cmd((char*)"AT+CIPQSEND=1\r\n", 1000);
+	delay_ms(2000);
+	USART_clear_buf(1);
 	return 1;
 }
 
@@ -466,6 +497,8 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 			time_out++;
 		}while ((time_out<(timeout_ms/100))&&(!r));
 		if (time_out>=(timeout_ms/100)){
+			sim800->tcp_connect=false;
+			sim800->simState = sim_current_connection_status();
 			memset(buff,0,128);
 			sprintf((char*)buff,"Connecting to: %s:%d: FAILED. Try again",sim800->mqttServer.host,sim800->mqttServer.port);
 			sim_log((char*)buff);
@@ -475,7 +508,7 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 			sprintf((char*)buff,"Connecting to: %s:%d: SUCCESS",sim800->mqttServer.host,sim800->mqttServer.port);
 			sim_log((char*)buff);
 			free(buff);
-			sim800->mqttServer.connect = true;
+			sim800->tcp_connect = true;
 			sim800->simState = sim_current_connection_status();
 			return 1;
 		}
@@ -535,12 +568,11 @@ uint8_t sim_disconnect_server(SIM800_t* sim800)
 	}
 	return 0;
 }
-void MQTT_connect(SIM800_t *sim800){
-	u8 time_out=0;
-	u8 r=0;
+uint8_t MQTT_Connect(SIM800_t *sim800){
 	unsigned char buf[128] = {0};
 	sim800->mqttReceive.newEvent = false;
-	if (sim800->mqttServer.connect == true)
+	sim800->mqttServer.connect = false;
+	if (sim800->tcp_connect == true)
 	{
 		MQTTPacket_connectData datas = MQTTPacket_connectData_initializer;
 		datas.username.cstring = sim800->mqttClient.username;
@@ -552,24 +584,32 @@ void MQTT_connect(SIM800_t *sim800){
 		sim_send_cmd((char*)"AT+CIPSEND\r\n", 200);
 		USART1_Send_Array((unsigned char*)buf,data_len);
 		USART1_Send_Char(0x1A);
-		delay_ms(500);
+		if (MQTT_PingReq(sim800)) return 1;
+		else return 0;
 	}
+	return 0;
 }
 uint8_t MQTT_PingReq(SIM800_t *sim800)
 {
 	unsigned char ping_frame[2]={0xC0,0};
 	uint8_t time_out=0;
 	USART_clear_buf(1);
-	PINGREQ_Flag = 0;
+	PINGRESP_Flag = 0;
 	sim_send_cmd((char*)"AT+CIPSEND\r\n", 200);
 	USART1_Send_Array(ping_frame, 2);
 	USART1_Send_Char(0x1A);
-	while ((time_out<20)&&(PINGREQ_Flag==0)){
+	while ((time_out<20)&&(PINGRESP_Flag==0)){
 		time_out++;
 		delay_ms(100);
 	}
-	if (time_out>=20) return 0;
-	else return 1;
+	if (time_out>=20) {
+		sim800->mqttServer.connect = false;
+		return 0;
+	}
+	else {
+		sim800->mqttServer.connect = true;
+		return 1;
+	}
 }
 void MQTT_Pub(char *topic, char *payload) {
     unsigned char buf[256] = {0};
@@ -616,10 +656,7 @@ void clearMqttBuffer(void) {
 void Sim800_RxCallBack(void) {
 	unsigned char c;
 	c = USART_ReceiveData(USART1);
-	if (c== 0xD0)
-	{
-		PINGREQ_Flag = 1;
-	}
+	if (c== 0xD0) PINGRESP_Flag = 1;
 	if (RxCounter1<BUFFER_SIZE1) RxBuffer1[RxCounter1++]=c;
 	else RxCounter1 = 0;
 #if (QoS==0)

@@ -7,7 +7,7 @@
 #include "usart.h"
 
 __IO char RxBuffer1[BUFFER_SIZE1];
-__IO uint8_t RxCounter1=0;
+__IO uint16_t RxCounter1=0;
 
 __IO char RxBuffer5[BUFFER_SIZE5];
 __IO uint8_t RxCounter5=0;
