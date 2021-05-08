@@ -29,17 +29,22 @@ typedef struct{
     uint8_t	month;
     uint8_t year;
 }UTC_Date;
-
+typedef struct{
+	int int_part;
+	long dec_part;
+}dec_degree;
 typedef struct{
     uint8_t	lat_dd;
     uint8_t	lat_mm;
     int	lat_mmmm;
+    dec_degree lat_dec_degree;
 }Latitude;
 
 typedef struct{
     int lon_ddd;
     uint8_t	lon_mm;
     int	lon_mmmm;
+    dec_degree lon_dec_degree;
 }Longitude;
 
 typedef struct{
@@ -66,4 +71,5 @@ void gps_reset();
 uint8_t  gps_read_data(RMC_Data *RMC);
 void gps_init();
 bool RMC_Parse(RMC_Data *RMC, char *RMC_Sentence, int RMC_len);
+void RMC_json_init(RMC_Data *RMC, char *buffer);
 #endif /* GPS_GPS_H_ */

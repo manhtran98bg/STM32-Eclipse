@@ -20,18 +20,22 @@ dht11_data data;
 u8 status;
 u8 str[16]; // Max_LEN = 16
 // Khai bao cac bien cho SIM800 && MQTT broker
-const char IP_Address[]="broker.hivemq.com";
+//const char IP_Address[]="broker.hivemq.com";
+const char IP_Address[]="broker.emqx.io";
 uint16_t port=1883;
 SIM800_t *sim800;
-sim_t	*sim_APN;
 RMC_Data *RMC;
 RTC_Time_t Time;
-MQTTString topicString[3] = MQTTString_initializer;
-//char RMC_test[]="$GPRMC,013732.000,A,3150.7238,N,11711.7278,E,10.34,0.00,220413,,,A*68\r\n";
+MQTTString topicString[10] = MQTTString_initializer;
+char RMC_test[]="$GPRMC,013732.000,A,3150.7238,N,11711.7278,E,10.34,0.00,220413,,,A*68\r\n";
 int requestedQoSs[3]={0,0,0};
 uchar serNum[5];
 char mqttTxBuffer[128]={0};
+char topic_pub[50]={0};
+char topic_buff[10][60]={{0}};
+char json_geowithtime[100]={0};
 uint32_t t_check_connection = 0;
+uint8_t nosignal_check = 0;
 #define _USE_SIM	1
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
@@ -43,56 +47,44 @@ static void clk_init();
 static void btn_init();
 static void board_init();
 void init_var(SIM800_t* sim800);
+void init_topic(MQTTString *topicList,char *topic_buff, char *IMEI);
+void first_pub_topic(MQTTString *topicList);
 int main(int argc, char* argv[])
 {
 	unsigned char *topic=(unsigned char*)calloc(64,sizeof(unsigned char));
 	unsigned char *payload=(unsigned char*)calloc(256,sizeof(unsigned char));
 	sim800=(SIM800_t*)malloc(sizeof(SIM800_t));
 	RMC = (RMC_Data*)malloc(sizeof(RMC_Data));
-	topicString[0].cstring = (char*)"testtopic/Rx1";
-	topicString[1].cstring = (char*)"testtopic/Rx2";
-	topicString[2].cstring = (char*)"testtopic/Rx3";
 	init_var(sim800);
+//	init_topic(topicString, (char*) topic_buff, (char*)"GSHT_867793039047735");
+	RMC_Parse(RMC, RMC_test, strlen(RMC_test));
+	RMC_json_init(RMC, json_geowithtime);
+	sprintf(mqttTxBuffer,"Lat:%d.%ld",RMC->Lat.lat_dec_degree.int_part,RMC->Lat.lat_dec_degree.dec_part);
 	board_init();
 #if _USE_SIM
 	if (sim800->power_state == ON) {
 		sim_init(sim800);
+		init_topic(topicString, (char*)topic_buff, (char*)sim800->sim_id.imei);
 		sim_set_TCP_connection();
-		sim_connect_server(sim800,10,5000);
+		if (sim_connect_server(sim800,10,5000)){
+			delay_ms(500);
+			MQTT_Connect(sim800);
+			delay_ms(500);
+			first_pub_topic(topicString);
+		}
 	}
-	MQTT_Connect(sim800);
-	MQTT_Pub((char*)"testtopic/Tx1",(char*) "Testmesage");
-	delay_ms(500);
-	MQTT_Sub(topicString, requestedQoSs,3);
-	delay_ms(500);
 	t_check_connection = millis();
 #endif
 	while(1)
 	{
 #if _USE_SIM
-		if (millis()- t_check_connection >=10000)
-		{
+		if (millis() - t_check_connection>=10000) {
 			t_check_connection = millis();
-#if _DEBUG_UART5
-			UART5_Send_String((char*)"Check connection with MQTT Broker");
-			UART5_Send_String("\n");
-#endif
-			if (MQTT_PingReq(sim800)==0){
-#if _DEBUG_UART5
-				UART5_Send_String((char*)"Reconnecting...");
-				UART5_Send_String("\n");
-#endif
-				if (sim_current_connection_status()==CONNECT_OK) {
-					sim_disconnect_server(sim800);
-					sim_connect_server(sim800,10,5000);
-					MQTT_Connect(sim800);
-				}
-				else if (sim_current_connection_status()== TCP_CLOSED)
-				{
-					sim_connect_server(sim800,10,5000);
-					MQTT_Connect(sim800);
-				}
-			}
+			sim_nosignal_handler(sim800);
+
+		}
+		if (nosignal_check==1) {
+			sim_reconnect_handler(sim800);
 		}
 		if (sim800->mqttReceive.newEvent==1)
 		{
@@ -110,14 +102,15 @@ int main(int argc, char* argv[])
 #endif
 		}
 		else if (gps_read_data(RMC)){
+			sim800->signal_condition = sim_check_signal_condition(sim800, 500);
 			memset(mqttTxBuffer,0,sizeof(mqttTxBuffer));
 			sprintf(mqttTxBuffer,"Time:%d:%d:%d Date:%d:%d:%d",RMC->Time.hh,RMC->Time.mm,RMC->Time.ss,
 															   RMC->Date.day,RMC->Date.month,RMC->Date.year);
-			MQTT_Pub((char*)"testtopic/Tx1",(char*) mqttTxBuffer);
-			memset(mqttTxBuffer,0,sizeof(mqttTxBuffer));
-			sprintf(mqttTxBuffer,"Lat:%d:%d:%d Lon:%d:%d:%d",RMC->Lat.lat_dd,RMC->Lat.lat_mm,RMC->Lat.lat_mmmm,
-															 RMC->Lon.lon_ddd,RMC->Lon.lon_mm,RMC->Lon.lon_mmmm);
-			MQTT_Pub((char*)"testtopic/Tx2",(char*) mqttTxBuffer);
+			if (sim800->mqttServer.connect)	{
+				MQTT_Pub(topicString[8].cstring,json_geowithtime);
+			}
+//			sprintf(mqttTxBuffer,"Lat:%d:%d:%d Lon:%d:%d:%d",RMC->Lat.lat_dd,RMC->Lat.lat_mm,RMC->Lat.lat_mmmm,
+//															 RMC->Lon.lon_ddd,RMC->Lon.lon_mm,RMC->Lon.lon_mmmm);
 		}
 #endif
 //		status = MFRC522_Request(PICC_REQIDL, str);
@@ -148,20 +141,53 @@ int main(int argc, char* argv[])
 }
 void init_var(SIM800_t* sim800)
 {
-	sim_APN=(sim_t*)malloc(sizeof(sim_t));
-	sim_APN->apn = "m-wap";
-	sim_APN->apn_user = "mms";
-	sim_APN->apn_pass = "mms";
-	sim800->sim = sim_APN;
+	sim800->sim.apn = "m-wap";
+	sim800->sim.apn_user = "mms";
+	sim800->sim.apn_pass = "mms";
 	sim800->mqttServer.host = (char*)IP_Address;
 	sim800->mqttServer.port = port;
 	sim800->mqttServer.connect = false;
 	sim800->mqttClient.username = "user";
 	sim800->mqttClient.pass = "user";
 	sim800->mqttClient.clientID = "Client01";
-	sim800->mqttClient.keepAliveInterval = 120;
+	sim800->mqttClient.keepAliveInterval = 10;
 	sim800->power_state = OFF;
 	sim800->tcp_connect = false;
+	sim800->sim_id.model_id ="SIMCOM_SIM800C";
+	sim800->sim_id.manufacturer_id = "SIMCOM_Ltd";
+}
+void init_topic(MQTTString *topicList,char *topic_buff, char *IMEI)
+{
+
+	sprintf(topic_buff,"mandevices/GSHT_%s/$name",IMEI);
+	topicList[0].cstring = topic_buff;
+	sprintf(topic_buff+60,"mandevices/GSHT_%s/$state",IMEI);
+	topicList[1].cstring = topic_buff+60;
+	sprintf(topic_buff+120,"mandevices/GSHT_%s/$homie",IMEI);
+	topicList[2].cstring = topic_buff+120;
+	sprintf(topic_buff+180,"mandevices/GSHT_%s/$node",IMEI);
+	topicList[3].cstring = topic_buff+180;
+	sprintf(topic_buff+240,"mandevices/GSHT_%s/environment/temperature/$name",IMEI);
+	topicList[4].cstring = topic_buff+240;
+	sprintf(topic_buff+300,"mandevices/GSHT_%s/environment/temperature/$datatype",IMEI);
+	topicList[5].cstring = topic_buff+300;
+	sprintf(topic_buff+360,"mandevices/GSHT_%s/environment/humidity/$name",IMEI);
+	topicList[6].cstring = topic_buff+360;
+	sprintf(topic_buff+420,"mandevices/GSHT_%s/environment/humidity/$datatype",IMEI);
+	topicList[7].cstring = topic_buff+420;
+	sprintf(topic_buff+480,"mandevices/GSHT_%s/device/location",IMEI);
+	topicList[8].cstring = topic_buff+480;
+}
+void first_pub_topic(MQTTString *topicList)
+{
+	MQTT_Pub(topicList[0].cstring, "Giam sat hanh trinh");
+	delay_ms(50);
+	MQTT_Pub(topicList[1].cstring, "ready");
+	delay_ms(50);
+	MQTT_Pub(topicList[2].cstring, "4.0.0");
+	delay_ms(50);
+	MQTT_Pub(topicList[3].cstring, "enviroment,device");
+	delay_ms(50);
 }
 static void board_init()
 {

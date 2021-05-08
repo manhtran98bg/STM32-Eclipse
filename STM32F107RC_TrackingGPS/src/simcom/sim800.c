@@ -12,6 +12,7 @@ extern __IO char RxBuffer1[];
 extern __IO uint16_t RxCounter1;
 
 extern SIM800_t *sim800;
+extern MQTTString topicString[];
 bool txFlag = 0;
 bool PINGRESP_Flag = 0;
 bool mqtt_receive = 0;
@@ -19,6 +20,8 @@ unsigned char CONNACK_buffer[6]={0};
 unsigned char CONNACK_index = 0;
 char mqtt_buffer[1460] = {0};
 uint16_t mqtt_index = 0;
+extern char topic_state[];
+extern uint8_t nosignal_check;
 void sim_gpio_init()
 {
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOC, ENABLE);
@@ -244,11 +247,26 @@ signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms)
 		signal_str[1]=*(temp+7);
 		if (atoi(signal_str)!=0) signal = atoi(signal_str);
 	}
-	if (signal<2) return NOSIGNAL;
 	if ((signal>=2)&&(signal<=9)) return MARGINAL;
 	if ((signal>=10)&&(signal<=14)) return OK;
 	if ((signal>=15)&&(signal<=19)) return GOOD;
 	if ((signal>=20)&&(signal<=30)) return EXCELLENT;
+	return NOSIGNAL;
+}
+void sim_get_id(SIM800_t *sim800)
+{
+	u8 r=0;
+	u8 i=0,index=0;
+	u8 time_out = 0;
+	char temp[20]={0};
+	//Get IMEI
+	sim_send_cmd((char*)"AT+GSN\r\n", 100);
+	do {
+		r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
+	}while (!r);
+	for (i=2;i<17;i++)temp[index++]=RxBuffer1[i];
+	strcpy(sim800->sim_id.imei,temp);
+	delay_ms(100);
 }
 /*	Check SIM registration status
  * 	Send AT+CREG? Command
@@ -343,7 +361,7 @@ uint8_t sim_detach_gprs(char num_try, int timeout_ms)
 	sim_log("Deactive GPRS Service:FAILED.");
 	return 0;
 }
-static uint8_t sim_set_APN(sim_t *sim_APN, char num_try, int timeout_ms)
+static uint8_t sim_set_APN(SIM800_t *sim800, char num_try, int timeout_ms)
 {
 	u8 time_out=0;
 	u8 r=0;
@@ -353,7 +371,7 @@ static uint8_t sim_set_APN(sim_t *sim_APN, char num_try, int timeout_ms)
 	{
 		sim_log("Try to Set APN...");
 		time_out=0;
-		snprintf(str,sizeof(str),"AT+CSTT=\"%s\",\"%s\",\"%s\"\r\n",sim_APN->apn,sim_APN->apn_user,sim_APN->apn_pass);
+		snprintf(str,sizeof(str),"AT+CSTT=\"%s\",\"%s\",\"%s\"\r\n",sim800->sim.apn,sim800->sim.apn_user,sim800->sim.apn_pass);
 		sim_send_cmd((char*)str, 200);
 		do{
 			r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
@@ -442,8 +460,9 @@ uint8_t sim_init(SIM800_t *sim800)
 	if (!sim_check_simcard(max_try, time_out_ms)) return 0;
 	if (!sim_check_reg(max_try, time_out_ms)) return 0;
 	sim800->signal_condition=sim_check_signal_condition(sim800, 1000);
+	sim_get_id(sim800);
 	if (!sim_attach_gprs(max_try, time_out_ms)) return 0;
-	if (!sim_set_APN(sim800->sim,max_try,time_out_ms)) return 0;
+	if (!sim_set_APN(sim800,max_try,time_out_ms)) return 0;
 	sim_send_cmd((char*)"AT+CIPQSEND=1\r\n", 1000);
 	delay_ms(2000);
 	USART_clear_buf(1);
@@ -502,6 +521,7 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 			memset(buff,0,128);
 			sprintf((char*)buff,"Connecting to: %s:%d: FAILED. Try again",sim800->mqttServer.host,sim800->mqttServer.port);
 			sim_log((char*)buff);
+			sim_disconnect_server(sim800);
 		}
 		else {
 			memset(buff,0,128);
@@ -564,9 +584,70 @@ uint8_t sim_disconnect_server(SIM800_t* sim800)
 		}
 		sim_log("Close TCP connection: SUCCESSED.");
 		sim800->mqttServer.connect = false;
+		sim800->tcp_connect = false;
 		return 1;
 	}
 	return 0;
+}
+uint8_t sim_nosignal_handler(SIM800_t *sim800)
+{
+	u8 ping_res=0;
+	//Check Signal Condition
+	ping_res = MQTT_PingReq(sim800);
+		if (sim800->signal_condition<=MARGINAL && sim800->tcp_connect == true && ping_res==0){
+	#if _DEBUG_UART5
+			UART5_Send_String((char*)"Check connection with MQTT Broker: ");
+	#endif
+			ping_res = MQTT_PingReq(sim800);
+			if (ping_res==0 ){	//Poor Signal Condition.
+	#if _DEBUG_UART5
+				UART5_Send_String((char*)"Poor Signal Condition.");
+				UART5_Send_String("\n");
+	#endif
+	#if _DEBUG_UART5
+				UART5_Send_String((char*)"Disconnecting from MQTT Broker.\n");
+	#endif
+				sim_disconnect_server(sim800);	//Ngat ket noi TCP/IP
+				sim800->simState = sim_current_connection_status();	//Check TCP/IP status
+				nosignal_check = 1;
+				return 1;
+			}
+		}
+		else if (ping_res == 0)
+		{
+			sim800->simState = sim_current_connection_status();	//Check TCP/IP status
+			if (sim800->simState == CONNECT_OK)
+			{
+				sim_disconnect_server(sim800);	//Ngat ket noi TCP/IP
+				nosignal_check = 1;
+				return 1;
+			}
+		}
+	return 0;
+}
+void sim_reconnect_handler(SIM800_t *sim800)
+{
+	if (sim800->signal_condition>MARGINAL && sim800->tcp_connect==false) {	//Signal Condition OK, GOOD, EXCELLENT but Disconnected
+		if (sim800->simState== TCP_CLOSED) {	//Neu da ngat ket noi TCP/IP
+			if (sim_connect_server(sim800,1,2000)) {
+				delay_ms(200);
+				MQTT_Connect(sim800);			//Ket noi MQTT Broker.
+				MQTT_Pub(topicString[1].cstring,(char*) "ready");
+				nosignal_check =  0;
+			}
+		}
+		else {
+			sim_detach_gprs(1, 1000);
+			delay_ms(200);
+			if (sim_attach_gprs(1, 1000))
+				if (sim_connect_server(sim800,3,2000)) {
+					delay_ms(500);
+					MQTT_Connect(sim800);			//Ket noi MQTT Broker.
+					MQTT_Pub(topicString[1].cstring,(char*) "ready");
+					nosignal_check =  0;
+				}
+		}
+	}
 }
 uint8_t MQTT_Connect(SIM800_t *sim800){
 	unsigned char buf[128] = {0};
@@ -575,15 +656,21 @@ uint8_t MQTT_Connect(SIM800_t *sim800){
 	if (sim800->tcp_connect == true)
 	{
 		MQTTPacket_connectData datas = MQTTPacket_connectData_initializer;
-		datas.username.cstring = sim800->mqttClient.username;
-		datas.password.cstring = sim800->mqttClient.pass;
+//		datas.username.cstring = sim800->mqttClient.username;
+//		datas.password.cstring = sim800->mqttClient.pass;
 		datas.clientID.cstring = sim800->mqttClient.clientID;
 		datas.keepAliveInterval = sim800->mqttClient.keepAliveInterval;
 		datas.cleansession = 1;
+		datas.willFlag = 1;
+		datas.will.qos = 1;
+		datas.will.retained = 1;
+		datas.will.topicName.cstring = topicString[1].cstring;
+		datas.will.message.cstring = "lost";
 		int data_len = MQTTSerialize_connect(buf, sizeof(buf), &datas);
 		sim_send_cmd((char*)"AT+CIPSEND\r\n", 200);
 		USART1_Send_Array((unsigned char*)buf,data_len);
 		USART1_Send_Char(0x1A);
+		delay_ms(500);
 		if (MQTT_PingReq(sim800)) return 1;
 		else return 0;
 	}
@@ -598,11 +685,11 @@ uint8_t MQTT_PingReq(SIM800_t *sim800)
 	sim_send_cmd((char*)"AT+CIPSEND\r\n", 200);
 	USART1_Send_Array(ping_frame, 2);
 	USART1_Send_Char(0x1A);
-	while ((time_out<20)&&(PINGRESP_Flag==0)){
+	while ((time_out<10)&&(PINGRESP_Flag==0)){
 		time_out++;
 		delay_ms(100);
 	}
-	if (time_out>=20) {
+	if (time_out>=10) {
 		sim800->mqttServer.connect = false;
 		return 0;
 	}

@@ -45,7 +45,11 @@ typedef struct {
     char *apn_user;
     char *apn_pass;
 } sim_t;
-
+typedef struct{
+	char *model_id;
+	char *manufacturer_id;
+	char imei[16];
+}sim_id_t;
 typedef struct {
     char *host;
     uint16_t port;
@@ -72,7 +76,7 @@ typedef struct {
 } mqttReceive_t;
 
 typedef struct {
-    sim_t *sim;
+    sim_t sim;
     mqttServer_t mqttServer;
     mqttClient_t mqttClient;
     mqttReceive_t mqttReceive;
@@ -80,6 +84,7 @@ typedef struct {
     state	simState;
     bool tcp_connect;
 	signal_t signal_condition;
+	sim_id_t sim_id;
 } SIM800_t;
 
 void sim_gpio_init();
@@ -94,6 +99,9 @@ uint8_t sim_detach_gprs(char num_try, int timeout_ms);
 uint8_t sim_set_TCP_connection();
 uint8_t sim_send_message(unsigned char* message, uint8_t datalen);
 state sim_current_connection_status();
+signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms);
+void sim_reconnect_handler(SIM800_t *sim800);
+uint8_t sim_nosignal_handler(SIM800_t *sim800);
 void MQTT_Pub(char *topic, char *payload);
 void MQTT_Sub(MQTTString *topicString, int *requestedQoSs, int topic_count) ;
 uint8_t MQTT_Connect(SIM800_t *sim800);

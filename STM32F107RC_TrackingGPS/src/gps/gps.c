@@ -54,7 +54,7 @@ uint8_t  gps_read_data(RMC_Data *RMC)
 {
 	if (flagStop)
 	{
-		RMC_Parse(RMC, (char*)RxBuffer4, RxCounter4);
+		//RMC_Parse(RMC, (char*)RxBuffer4, RxCounter4);
 #if _DEBUG
 		trace_puts((char*)RxBuffer4);
 #endif
@@ -104,6 +104,7 @@ static bool RMC_GetLatitude(RMC_Data *RMC,char *Lat_str)
 	char lat_dd[3]={0};
 	char lat_mm[3]={0};
 	char lat_mmmm[5]={0};
+	double M_m,D_d;
 	int i=0,j=0;
 	if (strlen(Lat_str)==0)
 	{
@@ -121,6 +122,10 @@ static bool RMC_GetLatitude(RMC_Data *RMC,char *Lat_str)
 		RMC->Lat.lat_dd = atoi(lat_dd);
 		RMC->Lat.lat_mm = atoi(lat_mm);
 		RMC->Lat.lat_mmmm = atoi(lat_mmmm);
+		M_m = RMC->Lat.lat_mm + (double)RMC->Lat.lat_mmmm/10000.0;
+		D_d = (double)M_m/60.0;
+		RMC->Lat.lat_dec_degree.int_part = RMC->Lat.lat_dd;
+		RMC->Lat.lat_dec_degree.dec_part =(long) (D_d*100000000);
 	}
 	return 1;
 }
@@ -130,6 +135,7 @@ static bool RMC_GetLongitude(RMC_Data *RMC,char *Lon_str)
 	char lon_ddd[4]={0};
 	char lon_mm[3]={0};
 	char lon_mmmm[5]={0};
+	double M_m,D_d;
 	int i=0,j=0;
 	if (strlen(Lon_str)==0)
 	{
@@ -147,13 +153,37 @@ static bool RMC_GetLongitude(RMC_Data *RMC,char *Lon_str)
 		RMC->Lon.lon_ddd = atoi(lon_ddd);
 		RMC->Lon.lon_mm = atoi(lon_mm);
 		RMC->Lon.lon_mmmm = atoi(lon_mmmm);
+		M_m = RMC->Lon.lon_mm + (double)RMC->Lon.lon_mmmm/10000.0;
+		D_d = (double)M_m/60.0;
+		RMC->Lon.lon_dec_degree.int_part = RMC->Lon.lon_ddd;
+		RMC->Lon.lon_dec_degree.dec_part =(long) (D_d*100000000);
 	}
 	return 1;
+}
+/* Parse data to json GeoWithTime
+ * Param: 	RMC: RMC data structure pointer
+ * 			buffer: Pointer to buffer array.
+ * Return:	No return
+ * 			GeoWithTime: Data Json:
+ * 			{
+ * 				"long":"D.d",
+ * 				"lat":"D.d",
+ * 				"time":"UTC DateTime ISO 8601"
+ * 			}
+ */
+void RMC_json_init(RMC_Data *RMC, char *buffer)
+{
+	sprintf(buffer,"{\"lng\":\"%d.%ld\","
+				   "\"lat\":\"%d.%ld\","
+				   "\"time\":\"20%d-0%d-%dT0%d:%d:%d+00:00\"}",RMC->Lon.lon_dec_degree.int_part,RMC->Lon.lon_dec_degree.dec_part,
+				   RMC->Lat.lat_dec_degree.int_part,RMC->Lat.lat_dec_degree.dec_part,
+				   RMC->Date.year,RMC->Date.month,RMC->Date.day,
+				   RMC->Time.hh,RMC->Time.mm,RMC->Time.ss);
 }
 static double str2float(char *str)
 {
 	int int_part = 0,dec_part = 0;
-	int i=0,j=0,lt=1;
+	unsigned int i=0,j=0,lt=1;
 	char int_chr[10]={0};
 	char dec_chr[10]={0};
 	while (str[i]!='.') {
