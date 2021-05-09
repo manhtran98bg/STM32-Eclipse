@@ -8,6 +8,7 @@
 #include "rfid/mfrc552.h"
 #include "gps/gps.h"
 #include "rtc/rtc.h"
+#include "lcd/sh1106.h"
 // ----------------------------------------------------------------------------
 
 #pragma GCC diagnostic push
@@ -36,7 +37,7 @@ char topic_buff[10][60]={{0}};
 char json_geowithtime[100]={0};
 uint32_t t_check_connection = 0;
 uint8_t nosignal_check = 0;
-#define _USE_SIM	1
+#define _USE_SIM	0
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 static void user_led_init();
@@ -56,11 +57,19 @@ int main(int argc, char* argv[])
 	sim800=(SIM800_t*)malloc(sizeof(SIM800_t));
 	RMC = (RMC_Data*)malloc(sizeof(RMC_Data));
 	init_var(sim800);
-//	init_topic(topicString, (char*) topic_buff, (char*)"GSHT_867793039047735");
 	RMC_Parse(RMC, RMC_test, strlen(RMC_test));
 	RMC_json_init(RMC, json_geowithtime);
 	sprintf(mqttTxBuffer,"Lat:%d.%ld",RMC->Lat.lat_dec_degree.int_part,RMC->Lat.lat_dec_degree.dec_part);
 	board_init();
+	sh1106_Init();
+	sh1106_SetCursor(2, 10);
+	sh1106_WriteString("XIN CHAO", Font_6x8, White);
+	sh1106_UpdateScreen();
+	sh1106_SetCursor(2, 20);
+	sh1106_WriteString("Cac ban", Font_6x8, White);
+	sh1106_UpdateScreen();
+	while(1);
+
 #if _USE_SIM
 	if (sim800->power_state == ON) {
 		sim_init(sim800);
@@ -202,7 +211,9 @@ static void board_init()
 	usart_init();
 	MFRC522_Init();
 	gps_init();
+#if _USE_SIM
 	sim_power_on(sim800);
+#endif
 }
 static void btn_init(){
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
