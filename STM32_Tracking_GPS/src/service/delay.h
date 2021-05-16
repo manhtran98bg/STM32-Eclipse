@@ -10,4 +10,5 @@
 #include <main.h>
 void delay_ms(uint32_t ms);
 void dUS_tim4(uint16_t uS);
+uint32_t millis(void);
 #endif /* SERVICE_DELAY_H_ */

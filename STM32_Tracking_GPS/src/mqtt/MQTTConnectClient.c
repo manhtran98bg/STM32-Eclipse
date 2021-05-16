@@ -96,11 +96,12 @@ int MQTTSerialize_connect(unsigned char* buf, int buflen, MQTTPacket_connectData
 		flags.bits.willRetain = options->will.retained;
 	}
 
-	if (options->username.cstring || options->username.lenstring.data)
-		flags.bits.username = 1;
-	if (options->password.cstring || options->password.lenstring.data)
-		flags.bits.password = 1;
-
+//	if (options->username.cstring || options->username.lenstring.data)
+//		flags.bits.username = 1;
+//	if (options->password.cstring || options->password.lenstring.data)
+//		flags.bits.password = 1;
+	flags.bits.username = 0;
+	flags.bits.password = 0;
 	writeChar(&ptr, flags.all);
 	writeInt(&ptr, options->keepAliveInterval);
 	writeMQTTString(&ptr, options->clientID);
