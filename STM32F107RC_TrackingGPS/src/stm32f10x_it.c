@@ -1,6 +1,10 @@
 
 #include "stm32f10x_it.h"
 #include "usart/usart.h"
+#include "lcd/sh1106.h"
+#include "rtc/rtc.h"
+#include "simcom/sim800.h"
+#include "gps/gps.h"
 volatile uint32_t msTicks=0;
 volatile uint32_t myTicks_tim4=0;
 uint32_t uwTick=0;
@@ -9,9 +13,12 @@ extern __IO uint8_t RxCounter5;
 
 extern __IO char RxBuffer4[];
 extern __IO uint8_t RxCounter4;
-extern char mqttTxBuffer[];
 extern __IO uint8_t flagStart,flagStop;
+extern char json_geowithtime[];
+extern char time_buffer[];
+extern RTC_Time_t Time;
 bool flagRx5=0;
+extern bool _1sflag;
 void NMI_Handler(void)
 {
 
@@ -88,6 +95,9 @@ void UART4_IRQHandler(void)
 		if (c=='\n') {
 			flagStart = 0;
 			flagStop = 1;
+			RMC_Parse(&gps_l70->RMC, (char*)RxBuffer4, RxCounter4);
+			RMC_json_init(&gps_l70->RMC, json_geowithtime);
+			gps_l70->gps_err = GPS_NO_ERR;
 		}
 		if (flagStart){
 			if (RxCounter4<BUFFER_SIZE4) RxBuffer4[RxCounter4++]=c;	//Save Data to RxBuffer4
@@ -120,6 +130,13 @@ void RTC_IRQHandler(void)
 	{
 		/* Clear the RTC Second interrupt */
 		RTC_ClearITPendingBit(RTC_IT_SEC);
+		RTC_GetTime(&Time);
+		if (Time.minute<10) sprintf(time_buffer,"%d:0%d",Time.hour,Time.minute);
+		else sprintf(time_buffer,"%d:%d",Time.hour,Time.minute);
+		if (Time.old_minute != Time.minute){
+			_1sflag = true;
+			Time.old_minute = Time.minute;
+		}
 	    /* Wait until last write operation on RTC registers has finished */
 	    RTC_WaitForLastTask();
 	}

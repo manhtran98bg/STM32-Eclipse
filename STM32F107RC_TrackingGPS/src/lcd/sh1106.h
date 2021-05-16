@@ -10,6 +10,7 @@
 #include "main.h"
 #include "sh1106_conf.h"
 #include "sh1106_font.h"
+#include "bitmap.h"
 #include "../i2c/i2c.h"
 // SH1106 OLED height in pixels
 #ifndef SH1106_HEIGHT
@@ -34,11 +35,16 @@ typedef enum {
 	SH1106_OK = 0x00,
 	SH1106_ERR = 0x01  // Generic error.
 } SH1106_Error_t;
-
+typedef enum {
+	NO_ALIGN = 0,
+	ALIGN_LEFT,
+	ALIGN_RIGHT,
+	ALIGN_CENTER
+}Align_t;
 // Struct to store transformations
 typedef struct {
-    uint16_t CurrentX;
-    uint16_t CurrentY;
+    uint8_t CurrentX;
+    uint8_t CurrentY;
     uint8_t Inverted;
     uint8_t Initialized;
     uint8_t DisplayOn;
@@ -53,14 +59,16 @@ void sh1106_Init(void);
 void sh1106_Fill(SH1106_COLOR color);
 void sh1106_UpdateScreen(void);
 void sh1106_DrawPixel(uint8_t x, uint8_t y, SH1106_COLOR color);
-char sh1106_WriteChar(char ch, FontDef Font, SH1106_COLOR color);
-char sh1106_WriteString(char* str, FontDef Font, SH1106_COLOR color);
+char sh1106_WriteChar(uint8_t x, uint8_t y, char ch, FontDef Font, SH1106_COLOR color);
+char sh1106_WriteString(uint8_t x, uint8_t y, char* str, FontDef Font, SH1106_COLOR color, Align_t Align);
 void sh1106_SetCursor(uint8_t x, uint8_t y);
-void sh1106_Line(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SH1106_COLOR color);
+void sh1106_DrawLine(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SH1106_COLOR color);
 void sh1106_DrawArc(uint8_t x, uint8_t y, uint8_t radius, uint16_t start_angle, uint16_t sweep, SH1106_COLOR color);
 void sh1106_DrawCircle(uint8_t par_x, uint8_t par_y, uint8_t par_r, SH1106_COLOR color);
 void sh1106_Polyline(const SH1106_VERTEX *par_vertex, uint16_t par_size, SH1106_COLOR color);
 void sh1106_DrawRectangle(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SH1106_COLOR color);
+void sh1106_DrawBitmap(uint8_t x, uint8_t y, BitmapDef bitmap);
+void sh1106_Clear(SH1106_COLOR color);
 /**
  * @brief Sets the contrast of the display.
  * @param[in] value contrast to set.

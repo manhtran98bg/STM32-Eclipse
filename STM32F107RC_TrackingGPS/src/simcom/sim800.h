@@ -74,7 +74,15 @@ typedef struct {
     unsigned char topic[64];
     int topicLen;
 } mqttReceive_t;
-
+typedef enum{
+	NO_PWR = 0,
+	NO_RES,
+	NO_SIM,
+	NO_REG,
+	NO_GPRS,
+	NO_APN,
+	NO_ERR,
+}error_t;
 typedef struct {
     sim_t sim;
     mqttServer_t mqttServer;
@@ -84,10 +92,13 @@ typedef struct {
     state	simState;
     bool tcp_connect;
 	signal_t signal_condition;
+	char rssi[4];
 	sim_id_t sim_id;
+	error_t	sim_err;
 } SIM800_t;
-
+extern SIM800_t *sim800;
 void sim_gpio_init();
+uint8_t sim_power_status(SIM800_t *sim800);
 uint8_t sim_power_on(SIM800_t *sim800);
 void sim_power_off(SIM800_t *sim800);
 void sim_send_cmd(char* cmd, uint16_t ms);
@@ -99,6 +110,7 @@ uint8_t sim_detach_gprs(char num_try, int timeout_ms);
 uint8_t sim_set_TCP_connection();
 uint8_t sim_send_message(unsigned char* message, uint8_t datalen);
 state sim_current_connection_status();
+void sim_error_handler(void);
 signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms);
 void sim_reconnect_handler(SIM800_t *sim800);
 uint8_t sim_nosignal_handler(SIM800_t *sim800);

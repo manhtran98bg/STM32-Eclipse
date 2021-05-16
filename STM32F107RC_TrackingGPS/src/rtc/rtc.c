@@ -111,9 +111,9 @@ void RTC_GetTime(RTC_Time_t *Time)
 {
 	uint32_t Time_Var = RTC_GetCounter();
 	/* Reset RTC Counter when Time is 23:59:59 */
-	if (Time_Var == 0x0001517F)
+	if (Time_Var >= 0x0001517F)
 	{
-		RTC_SetCounter(0x0);
+		RTC_WriteTime(00, 00, 00);
 		/* Wait until last write operation on RTC registers has finished */
 		RTC_WaitForLastTask();
 	}

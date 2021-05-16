@@ -216,13 +216,14 @@ void sh1106_DrawPixel(uint8_t x, uint8_t y, SH1106_COLOR color) {
 // ch       => char om weg te schrijven
 // Font     => Font waarmee we gaan schrijven
 // color    => Black or White
-char sh1106_WriteChar(char ch, FontDef Font, SH1106_COLOR color) {
+char sh1106_WriteChar(uint8_t x, uint8_t y, char ch, FontDef Font, SH1106_COLOR color) {
     uint32_t i, b, j;
 
     // Check if character is valid
     if (ch < 32 || ch > 126)
         return 0;
-
+    SH1106.CurrentX = x;
+    SH1106.CurrentY = y;
     // Check remaining space on current line
     if (SH1106_WIDTH < (SH1106.CurrentX + Font.FontWidth) ||
     		SH1106_HEIGHT < (SH1106.CurrentY + Font.FontHeight))
@@ -230,7 +231,6 @@ char sh1106_WriteChar(char ch, FontDef Font, SH1106_COLOR color) {
         // Not enough space on current line
         return 0;
     }
-
     // Use the font to write
     for(i = 0; i < Font.FontHeight; i++) {
         b = Font.data[(ch - 32) * Font.FontHeight + i];
@@ -250,10 +250,30 @@ char sh1106_WriteChar(char ch, FontDef Font, SH1106_COLOR color) {
     return ch;
 }
 // Write full string to screenbuffer
-char sh1106_WriteString(char* str, FontDef Font, SH1106_COLOR color) {
+char sh1106_WriteString(uint8_t x, uint8_t y, char* str, FontDef Font, SH1106_COLOR color, Align_t Align) {
+    switch (Align) {
+		case NO_ALIGN:
+			SH1106.CurrentX = x;
+			SH1106.CurrentY = y;
+			break;
+		case ALIGN_LEFT:
+			SH1106.CurrentX = 2;
+			SH1106.CurrentY = y;
+			break;
+		case ALIGN_RIGHT:
+			SH1106.CurrentX = 130-Font.FontWidth*strlen(str);
+			SH1106.CurrentY = y;
+			break;
+		case ALIGN_CENTER:
+			SH1106.CurrentX = (uint8_t)(130-Font.FontWidth*strlen(str))/2;
+			SH1106.CurrentY = y;
+			break;
+		default:
+			break;
+	}
     // Write until null-byte
     while (*str) {
-        if (sh1106_WriteChar(*str, Font, color) != *str) {
+        if (sh1106_WriteChar(SH1106.CurrentX, SH1106.CurrentY, *str, Font, color) != *str) {
             // Char could not be written
             return *str;
         }
@@ -269,4 +289,75 @@ char sh1106_WriteString(char* str, FontDef Font, SH1106_COLOR color) {
 void sh1106_SetCursor(uint8_t x, uint8_t y) {
 	SH1106.CurrentX = x;
 	SH1106.CurrentY = y;
+}
+// Draw line by Bresenhem's algorithm
+void sh1106_DrawLine(uint8_t x1, uint8_t y1, uint8_t x2, uint8_t y2, SH1106_COLOR color) {
+  int32_t deltaX = abs(x2 - x1);
+  int32_t deltaY = abs(y2 - y1);
+  int32_t signX = ((x1 < x2) ? 1 : -1);
+  int32_t signY = ((y1 < y2) ? 1 : -1);
+  int32_t error = deltaX - deltaY;
+  int32_t error2;
+
+  sh1106_DrawPixel(x2, y2, color);
+    while((x1 != x2) || (y1 != y2))
+    {
+    	sh1106_DrawPixel(x1, y1, color);
+    	error2 = error * 2;
+    	if(error2 > -deltaY)
+    	{
+    		error -= deltaY;
+    		x1 += signX;
+    	}
+    	else
+    	{
+    		/*nothing to do*/
+    	}
+
+    	if(error2 < deltaX)
+    	{
+    		error += deltaX;
+    		y1 += signY;
+    	}
+    	else
+    	{
+    		/*nothing to do*/
+    	}
+    }
+  return;
+}
+void sh1106_DrawBitmap(uint8_t x, uint8_t y, BitmapDef bitmap)
+{
+	SH1106.CurrentX = x;
+	SH1106.CurrentY = y;
+	__IO uint8_t ptr;
+	uint8_t b;
+	int col=0, row = 1,i=0;
+	if ((SH1106.CurrentX+bitmap.BitmapWidth)>SH1106_WIDTH || (SH1106.CurrentY+bitmap.BitmapHeight)>SH1106_HEIGHT)
+		return;
+	b = bitmap.BitmapWidth/8;
+	for (row=0;row<bitmap.BitmapHeight;row++)	//Scan N row.
+	{
+		for(col=0;col<b;col++)	//Scan one row.
+		{
+			ptr = bitmap.data[row+col];
+			for ( i = 0;i<8;i++){
+				if ((bitmap.data[row*b+col]<<i) & 0x80) {
+					sh1106_DrawPixel(SH1106.CurrentX, SH1106.CurrentY, (SH1106_COLOR) White);
+				}
+				else  {
+					sh1106_DrawPixel(SH1106.CurrentX, SH1106.CurrentY, (SH1106_COLOR) Black);
+				}
+				SH1106.CurrentX++;
+			}
+		}
+		SH1106.CurrentX = x;
+		SH1106.CurrentY++;
+	}
+}
+void sh1106_Clear(SH1106_COLOR color)
+{
+	sh1106_Fill(color);
+	sh1106_UpdateScreen();
+	sh1106_SetCursor(2, 0);
 }

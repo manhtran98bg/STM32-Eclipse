@@ -12,6 +12,7 @@ typedef struct{
 	uint8_t hour;
 	uint8_t minute;
 	uint8_t second;
+	uint8_t old_minute;
 }RTC_Time_t;
 void RTC_Init();
 void RTC_NVIC_Config();

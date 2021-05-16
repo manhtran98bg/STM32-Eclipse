@@ -9,7 +9,8 @@
 #define MAIN_H_
 
 #define _DEBUG	0
-#define _DEBUG_UART5	1
+#define _DEBUG_UART5 1
+//#define _STM32F103RCT6_
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -19,4 +20,5 @@
 #include "stm32f10x.h"
 #include "port_pin.h"
 #include "stm32f10x_conf.h"
+#include "float.h"
 #endif /* MAIN_H_ */

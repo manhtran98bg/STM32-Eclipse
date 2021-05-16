@@ -7,10 +7,10 @@
 
 #include "gps.h"
 __IO uint8_t flagStart = 0,flagStop = 0;
-extern char mqttTxBuffer[];
 extern __IO uint8_t RxBuffer4[];
 extern __IO uint8_t RxCounter4;
 extern char dmaRxbuffer[];
+extern char json_geowithtime[];
 void gps_power_on()
 {
 	power_on_gps();
@@ -39,9 +39,10 @@ void gps_init()
 {
 	gps_rst_pin_init();
 	gps_power_on();
+	gps_l70->gps_err = GPS_NO_RES;
 	delay_ms(1000);
 	UART4_Send_String((char*)"$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n");
-	UART4_Send_String((char*)"$PMTK251,115200*1F\r\n");
+//	UART4_Send_String((char*)"$PMTK251,115200*1F\r\n");
 	USART_clear_buf(4);
 }
 void gps_set_baudrate(int baud)
@@ -50,11 +51,12 @@ void gps_set_baudrate(int baud)
 	sprintf(cmdBuf,"$PMTK251,%d*1F\r\n",baud);
 	UART4_Send_String(cmdBuf);
 }
-uint8_t  gps_read_data(RMC_Data *RMC)
+uint8_t  gps_read_data(gps_t *gps)
 {
 	if (flagStop)
 	{
-		//RMC_Parse(RMC, (char*)RxBuffer4, RxCounter4);
+		RMC_Parse(&gps->RMC, (char*)RxBuffer4, RxCounter4);
+		RMC_json_init(&gps->RMC, json_geowithtime);
 #if _DEBUG
 		trace_puts((char*)RxBuffer4);
 #endif
@@ -111,6 +113,8 @@ static bool RMC_GetLatitude(RMC_Data *RMC,char *Lat_str)
 		RMC->Lat.lat_dd = 0;
 		RMC->Lat.lat_mm = 0;
 		RMC->Lat.lat_mmmm = 0;
+		RMC->Lat.lat_dec_degree.int_part=0;
+		RMC->Lat.lat_dec_degree.dec_part=0;
 	}
 	else
 	{
@@ -142,6 +146,8 @@ static bool RMC_GetLongitude(RMC_Data *RMC,char *Lon_str)
 		RMC->Lon.lon_ddd = 0;
 		RMC->Lon.lon_mm = 0;
 		RMC->Lon.lon_mmmm = 0;
+		RMC->Lon.lon_dec_degree.int_part=0;
+		RMC->Lon.lon_dec_degree.dec_part=0;
 	}
 	else
 	{

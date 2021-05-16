@@ -7,6 +7,7 @@
 #include "sim800.h"
 #include "../service/delay.h"
 #include "../usart/usart.h"
+#include "../lcd/sh1106.h"
 extern __IO char RxBuffer1[];
 
 extern __IO uint16_t RxCounter1;
@@ -20,7 +21,10 @@ unsigned char CONNACK_buffer[6]={0};
 unsigned char CONNACK_index = 0;
 char mqtt_buffer[1460] = {0};
 uint16_t mqtt_index = 0;
-extern char topic_state[];
+signed char rssi_arr[31] = {-113,-111,-109,-107,-105,-103,-101,-99,-97,-95,
+							-93,-91,-89,-87,-85,-83,-81,-79,-77,-75,
+							-73,-71,-69,-67,-65,-63,-61,-59,-57,-55,-53
+};
 extern uint8_t nosignal_check;
 void sim_gpio_init()
 {
@@ -50,6 +54,8 @@ uint8_t sim_power_status(SIM800_t *sim800)
 	}
 	else {
 		sim800->power_state = OFF;
+		sim800->tcp_connect = false;
+		sim800->mqttServer.connect = false;
 		return 0;
 	}
 }
@@ -232,14 +238,15 @@ signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms)
 	u8 time_out=0;
 	u8 r=0;
 	u8 signal = 0;
+	char rssi_buff[4]={0};
 	char *temp;
 	char signal_str[3]={0};
 	do {
 		r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
 		time_out++;
-		delay_ms(100);
-	}while ((time_out<(timeout_ms/100))&&(!r));
-	if (time_out>=(timeout_ms/100)) return NORESPONSE;
+		delay_ms(50);
+	}while ((time_out<(timeout_ms/50))&&(!r));
+	if (time_out>=(timeout_ms/50)) return NORESPONSE;
 	temp = strstr((char*)RxBuffer1,(char*)"+CSQ:");
 	if (temp!=NULL)
 	{
@@ -247,6 +254,7 @@ signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms)
 		signal_str[1]=*(temp+7);
 		if (atoi(signal_str)!=0) signal = atoi(signal_str);
 	}
+	sprintf(sim800->rssi,"%d",rssi_arr[signal]);
 	if ((signal>=2)&&(signal<=9)) return MARGINAL;
 	if ((signal>=10)&&(signal<=14)) return OK;
 	if ((signal>=15)&&(signal<=19)) return GOOD;
@@ -420,7 +428,8 @@ static uint8_t sim_get_local_IP(char num_try, int timeout_ms)
 	u8 time_out=0;
 	u8 r=0;
 	u8 repeat=0;
-	char *buff=(char*)malloc(40*sizeof(char));
+//	char *buff=(char*)malloc(40*sizeof(char));
+	char buff[40]={0};
 	for (repeat=0;repeat<num_try;repeat++)
 	{
 		time_out = 0;
@@ -438,7 +447,7 @@ static uint8_t sim_get_local_IP(char num_try, int timeout_ms)
 			memset(buff,0,40);
 			sprintf((char*)buff,"Your Local IP Address: %s",RxBuffer1);
 			sim_log((char*)buff);
-			free(buff);
+//			free(buff);
 			return 1;
 		}
 	}
@@ -456,30 +465,88 @@ uint8_t sim_init(SIM800_t *sim800)
 {
 	char max_try = 10;
 	int time_out_ms  = 3000;
-	if (!sim_check_response(max_try, time_out_ms)) return 0;
-	if (!sim_check_simcard(max_try, time_out_ms)) return 0;
-	if (!sim_check_reg(max_try, time_out_ms)) return 0;
+	if (!sim_power_on(sim800)) {
+		sim800->sim_err = NO_PWR;
+		return 0;
+	}
+	if (!sim_check_response(max_try, time_out_ms)) {
+		sim800->sim_err = NO_RES;
+		return 0;
+	}
+	if (!sim_check_simcard(max_try, time_out_ms)) {
+		sim800->sim_err = NO_SIM;
+		return 0;
+	}
+	if (!sim_check_reg(max_try, time_out_ms)) {
+		sim800->sim_err = NO_REG;
+		return 0;
+	}
 	sim800->signal_condition=sim_check_signal_condition(sim800, 1000);
 	sim_get_id(sim800);
-	if (!sim_attach_gprs(max_try, time_out_ms)) return 0;
-	if (!sim_set_APN(sim800,max_try,time_out_ms)) return 0;
+	if (!sim_attach_gprs(max_try, time_out_ms)) {
+		sim800->sim_err = NO_GPRS;
+		return 0;
+	}
+	if (!sim_set_APN(sim800,max_try,time_out_ms)) {
+		sim800->sim_err = NO_APN;
+		return 0;
+	}
 	sim_send_cmd((char*)"AT+CIPQSEND=1\r\n", 1000);
 	delay_ms(2000);
 	USART_clear_buf(1);
+	sim800->sim_err = NO_ERR;
 	return 1;
 }
 
+void sim_error_handler(void)
+{
+	if (sim800->sim_err == NO_PWR) {
+		sh1106_WriteString(2, 0, "NO POWER", Font_6x8, White, ALIGN_RIGHT);
+		sh1106_UpdateScreen();
+		return;
+	}
+	if (sim800->sim_err == NO_RES) {
+		sh1106_WriteString(2, 0, "NO RES", Font_6x8, White, ALIGN_RIGHT);
+		sh1106_UpdateScreen();
+		return;
+	}
+	if (sim800->sim_err == NO_SIM) {
+		sh1106_WriteString(2, 0, "NO SIM", Font_6x8, White, ALIGN_RIGHT);
+		sh1106_UpdateScreen();
+		return;
+	}
+	if (sim800->sim_err == NO_REG) {
+		sh1106_WriteString(2, 0, "NO REG", Font_6x8, White, ALIGN_RIGHT);
+		sh1106_UpdateScreen();
+		return;
+	}
+	if (sim800->sim_err == NO_GPRS) {
+		sh1106_WriteString(2, 0, "NO GPRS", Font_6x8, White, ALIGN_RIGHT);
+		sh1106_UpdateScreen();
+		return;
+	}
+	if (sim800->sim_err == NO_APN) {
+		sh1106_WriteString(2, 0, "NO APN", Font_6x8, White, ALIGN_RIGHT);
+		sh1106_UpdateScreen();
+		return;
+	}
+	if (sim800->sim_err == NO_ERR) {
+		sh1106_WriteString(2, 0, "NO ERROR", Font_6x8, White, ALIGN_RIGHT);
+		sh1106_UpdateScreen();
+		return;
+	}
+}
 uint8_t sim_send_message(unsigned char* message, uint8_t datalen)
 {
 	u8 time_out=0;
 	u8 r=0;
-	sim_send_cmd((char*)"AT+CIPSEND\r\n", 200);
+	sim_send_cmd((char*)"AT+CIPSEND\r\n", 50);
 	USART1_Send_Array(message, datalen);
 	USART1_Send_Char(0x1A);
 	do{
 		r = sim_check_cmd((char*)RxBuffer1, (char*)"DATA ACCEPT");
 		time_out++;
-		delay_ms(100);
+		delay_ms(50);
 	}
 	while ((time_out<10)&&(!r));
 	if (time_out>=10) return 0;
@@ -500,7 +567,8 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 	u8 time_out=0;
 	u8 r=0;
 	u8 repeat = 0;
-	char *buff=(char*)malloc(128*sizeof(char));
+//	char *buff=(char*)malloc(128*sizeof(char));
+	char buff[128]={0};
 	memset(buff,0,128);
 	sprintf((char*)buff,"Start connecting to: %s:%d",sim800->mqttServer.host,sim800->mqttServer.port);
 	sim_log((char*)buff);
@@ -527,7 +595,7 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 			memset(buff,0,128);
 			sprintf((char*)buff,"Connecting to: %s:%d: SUCCESS",sim800->mqttServer.host,sim800->mqttServer.port);
 			sim_log((char*)buff);
-			free(buff);
+			//free(buff);
 			sim800->tcp_connect = true;
 			sim800->simState = sim_current_connection_status();
 			return 1;
@@ -536,7 +604,7 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 	memset(buff,0,128);
 	sprintf((char*)buff,"Connecting to: %s:%d: FAILED",sim800->mqttServer.host,sim800->mqttServer.port);
 	sim_log((char*)buff);
-	free(buff);
+	//free(buff);
 	sim800->mqttServer.connect = false;
 	sim800->simState = sim_current_connection_status();
 	return 0;
@@ -619,6 +687,12 @@ uint8_t sim_nosignal_handler(SIM800_t *sim800)
 			if (sim800->simState == CONNECT_OK)
 			{
 				sim_disconnect_server(sim800);	//Ngat ket noi TCP/IP
+				nosignal_check = 1;
+				return 1;
+			}
+			else if (sim800->simState == TCP_CLOSED)
+			{
+				sim800->tcp_connect = false;
 				nosignal_check = 1;
 				return 1;
 			}

@@ -36,8 +36,8 @@
 //#define SH1106_Reset_Pin       OLED_Res_Pin
 
 // Mirror the screen if needed
-// #define SH1106_MIRROR_VERT
-// #define SH1106_MIRROR_HORIZ
+ #define SH1106_MIRROR_VERT
+ #define SH1106_MIRROR_HORIZ
 
 // Set inverse color if needed
 // # define SH1106_INVERSE_COLOR
@@ -47,7 +47,7 @@
 #define SH1106_INCLUDE_FONT_7x10
 #define SH1106_INCLUDE_FONT_11x18
 #define SH1106_INCLUDE_FONT_16x26
-
+#define SH1106_INCLUDE_BITMAP
 // Some OLEDs don't display anything in first two columns.
 // In this case change the following macro to 130.
 // The default value is 128.

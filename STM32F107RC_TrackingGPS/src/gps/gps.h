@@ -59,16 +59,25 @@ typedef struct{
     char COG[5];
     UTC_Date Date;
 }RMC_Data;
-
+typedef enum {
+	GPS_NO_PWR = 0,
+	GPS_NO_RES,
+	GPS_NO_ERR,
+}gps_error_t;
+typedef struct {
+	gps_error_t gps_err;
+	bool gps_pwr_state;
+	RMC_Data RMC;
+}gps_t;
 typedef struct{
     char *data;
     int datalen;
 }strArray;
-
+extern gps_t *gps_l70;
 void gps_power_on();
 void gps_power_off();
 void gps_reset();
-uint8_t  gps_read_data(RMC_Data *RMC);
+uint8_t  gps_read_data(gps_t *gps);
 void gps_init();
 bool RMC_Parse(RMC_Data *RMC, char *RMC_Sentence, int RMC_len);
 void RMC_json_init(RMC_Data *RMC, char *buffer);
