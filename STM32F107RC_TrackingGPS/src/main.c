@@ -43,8 +43,9 @@ uint32_t t_lcd_update = 0;
 uint8_t nosignal_check = 0;
 bool _1sflag = false;
 #define _USE_SIM	1
+#define _USE_LCD	1
 //#define _USE_TEST_RMC
-#define _TEST_DS18B20
+#define _USE_DS18B20
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 static void board_init();
@@ -73,28 +74,43 @@ int main(int argc, char* argv[])
 #endif
 	board_init();
 	RTC_GetTime(&Time);
-#ifdef _TEST_DS18B20
+#ifdef _USE_DS18B20
 	ds18_config(RES_9BIT);
 #endif
+#if _USE_LCD
 	lcd_start();
+#endif
 	sim_start();
 	gps_start();
+#if _USE_LCD
 	delay_ms(1000);
 	sh1106_Clear(Black);
 	sh1106_UpdateScreen();
+#endif
 	while(1)
 	{
+
 		if (_1sflag == true )
 		{
+#if _USE_LCD
 			sh1106_WriteString(50, 3, time_buffer, Font_6x8, White, ALIGN_RIGHT);
 			sh1106_UpdateScreen();
+#endif
 			_1sflag = false;
 		}
 		if (millis()-t_lcd_update>2000)
 		{
+#ifdef _USE_DS18B20
 			ds18_read_temp(&ds18b20);
-			sprintf(payload_buf,"%d",(int)ds18b20.temp);
+
+#else
+			ds18b20.temp = 25;
+#endif
+
+#if _USE_LCD
 			lcd_update();
+#endif
+			sprintf(payload_buf,"%d",(int)ds18b20.temp);
 			t_lcd_update = millis();
 		}
 #if _USE_SIM
@@ -129,8 +145,8 @@ int main(int argc, char* argv[])
 				sim800->signal_condition = sim_check_signal_condition(sim800, 200);
 				if (sim800->mqttServer.connect)	{
 					if (gps_l70->RMC.Data_Valid[0]!='V') MQTT_Pub(topicString[11].cstring,json_geowithtime);
-					MQTT_Pub(topicString[12].cstring,payload_buf);
-					MQTT_Pub(topicString[7].cstring,sim800->rssi);
+					MQTT_Pub(topicString[12].cstring,payload_buf);	//Temp Device
+					MQTT_Pub(topicString[7].cstring,sim800->rssi);	//RSSI
 				}
 			}
 		}
@@ -255,43 +271,61 @@ void first_pub_topic(MQTTString *topicList)
 static void sim_start(){
 #if _USE_SIM
 	if(sim_init(sim800)){	//Khoi tao sim thanh cong
+#if _USE_LCD
 		sim_error_handler();
+#endif
 		init_topic(topicString, (char*)topic_buff, (char*)sim800->sim_id.imei);
+#if _USE_LCD
 		sh1106_WriteString(2, 10, "-SETUP TCP:", Font_6x8, White, ALIGN_LEFT);
 		sh1106_UpdateScreen();
+#endif
 		if(sim_set_TCP_connection()){
+#if _USE_LCD
 			sh1106_WriteString(2, 10, "TCP_OK", Font_6x8, White, ALIGN_RIGHT);
 			sh1106_WriteString(2, 20, "-SERVER CONNECT:", Font_6x8, White, ALIGN_LEFT);
 			sh1106_UpdateScreen();
+#endif
 			if (sim_connect_server(sim800,10,5000)){	//Ket noi server thanh cong
+#if _USE_LCD
 				sh1106_WriteString(2, 20, "OK", Font_6x8, White, ALIGN_RIGHT);
 				sh1106_WriteString(2, 30, "-BROKER CONNECT:", Font_6x8, White, ALIGN_LEFT);
 				sh1106_UpdateScreen();
+#endif
 				delay_ms(500);
 				if (MQTT_Connect(sim800)){	//Ket noi MQTT Broker thanh cong
+#if _USE_LCD
 					sh1106_WriteString(2, 30, "OK", Font_6x8, White, ALIGN_RIGHT);
 					sh1106_UpdateScreen();
+#endif
 					delay_ms(500);
 					first_pub_topic(topicString);
 				}
 				else{	//ket noi mqtt broker fail
+#if _USE_LCD
 					sh1106_WriteString(2, 30, "FAIL", Font_6x8, White, ALIGN_RIGHT);
 					sh1106_UpdateScreen();
+#endif
 				}
 			}
 			else {	//Ket noi server khong thanh cong
+#if _USE_LCD
 				sh1106_WriteString(2, 20, "FAIL", Font_6x8, White, ALIGN_RIGHT);
 				sh1106_UpdateScreen();
+#endif
 			}
 		}
 		else {
+#if _USE_LCD
 			sh1106_WriteString(2, 10, "TCP_FAIL:", Font_6x8, White, ALIGN_RIGHT);
 			sh1106_UpdateScreen();
+#endif
 		}
 	}
 	//khoi tao sim khong thanh cong
+#if _USE_LCD
 	sim_error_handler();
 	t_check_connection = millis();
+#endif
 #endif
 }
 static void lcd_start()
@@ -329,6 +363,10 @@ static void lcd_update(){
 	else sh1106_DrawBitmap(40, 0, Gps_signal[1]);
 	sprintf(buf,"Temperature: %d *C",(int)ds18b20.temp);
 	sh1106_WriteString(2, 17, buf, Font_7x10, White, ALIGN_LEFT);
+	sprintf(buf,"Lat: %d.%ld",gps_l70->RMC.Lat.lat_dec_degree.int_part,gps_l70->RMC.Lat.lat_dec_degree.dec_part);
+	sh1106_WriteString(2, 30, buf, Font_7x10, White, ALIGN_LEFT);
+	sprintf(buf,"Lon: %d.%ld",gps_l70->RMC.Lon.lon_dec_degree.int_part,gps_l70->RMC.Lon.lon_dec_degree.dec_part);
+	sh1106_WriteString(2, 43, buf, Font_7x10, White, ALIGN_LEFT);
 	sh1106_UpdateScreen();
 }
 static void gps_start()
@@ -340,20 +378,28 @@ static void gps_start()
 	else {
 		gps_l70->gps_pwr_state = true;
 	}
+#if _USE_LCD
 	sh1106_WriteString(2, 40, "CHECK_GPS", Font_6x8, White, ALIGN_LEFT);
+#endif
 	if (gps_l70->gps_err == GPS_NO_PWR){
+#if _USE_LCD
 		sh1106_WriteString(2, 40, "NO_POWER", Font_6x8, White, ALIGN_RIGHT);
 		sh1106_UpdateScreen();
+#endif
 		return;
 	}
 	if (gps_l70->gps_err == GPS_NO_RES){
+#if _USE_LCD
 		sh1106_WriteString(2, 40, "NO_RES", Font_6x8, White, ALIGN_RIGHT);
 		sh1106_UpdateScreen();
+#endif
 		return;
 	}
 	if (gps_l70->gps_err == GPS_NO_ERR){
+#if _USE_LCD
 		sh1106_WriteString(2, 40, "NO_ERROR", Font_6x8, White, ALIGN_RIGHT);
 		sh1106_UpdateScreen();
+#endif
 		return;
 	}
 }

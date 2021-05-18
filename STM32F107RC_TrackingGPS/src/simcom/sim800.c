@@ -8,18 +8,18 @@
 #include "../service/delay.h"
 #include "../usart/usart.h"
 #include "../lcd/sh1106.h"
-extern __IO char RxBuffer1[];
 
-extern __IO uint16_t RxCounter1;
 
-extern SIM800_t *sim800;
-extern MQTTString topicString[];
 bool txFlag = 0;
 bool PINGRESP_Flag = 0;
 bool mqtt_receive = 0;
 unsigned char CONNACK_buffer[6]={0};
 unsigned char CONNACK_index = 0;
 char mqtt_buffer[1460] = {0};
+
+char sim_buffer[SIM_BUFFER_SIZE];
+uint16_t sim_buffer_index = 0;
+
 uint16_t mqtt_index = 0;
 signed char rssi_arr[31] = {-113,-111,-109,-107,-105,-103,-101,-99,-97,-95,
 							-93,-91,-89,-87,-85,-83,-81,-79,-77,-75,
@@ -39,6 +39,108 @@ void sim_gpio_init()
 	GPIO_Init_Structure.GPIO_Mode = GPIO_Mode_IN_FLOATING;
 	GPIO_Init(GPIOC, &GPIO_Init_Structure);
 }
+static void sim_uart_clk_init()
+{
+	/*Enable UART clock and GPIO clock*/
+	RCC_APB2PeriphClockCmd(SIM_UART_CLK, ENABLE);
+	RCC_APB2PeriphClockCmd(SIM_UART_GPIO_CLK, ENABLE);
+}
+static void sim_uart_gpio_init()
+{
+	GPIO_InitTypeDef gpio_init_structure;
+	//Config USART1: PA9 = TX, PA10 = RX
+	gpio_init_structure.GPIO_Pin = SIM_UART_GPIO_TX;
+	gpio_init_structure.GPIO_Mode = GPIO_Mode_AF_PP;
+	gpio_init_structure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(SIM_UART_GPIO, &gpio_init_structure);
+	gpio_init_structure.GPIO_Pin = SIM_UART_GPIO_RX;
+	gpio_init_structure.GPIO_Mode = GPIO_Mode_IPU;
+	GPIO_Init(SIM_UART_GPIO, &gpio_init_structure);
+}
+static void sim_uart_module_init()
+{
+	USART_InitTypeDef usart_init_structure;
+	/* Baud rate 9600, 8-bit data, One stop bit
+	* No parity, Do both Rx and Tx, No HW flow control
+	*/
+	usart_init_structure.USART_BaudRate = 115200;
+	usart_init_structure.USART_Mode = USART_Mode_Tx|USART_Mode_Rx;
+	usart_init_structure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	usart_init_structure.USART_Parity = USART_Parity_No;
+	usart_init_structure.USART_StopBits = USART_StopBits_1;
+	usart_init_structure.USART_WordLength = USART_WordLength_8b;
+	USART_Init(SIM_UART, &usart_init_structure);
+	/* Enable RXNE interrupt */
+	USART_ITConfig(SIM_UART, USART_IT_RXNE, ENABLE);
+	/*Enable USART	 */
+	USART_Cmd(SIM_UART, ENABLE);
+}
+static void sim_uart_nvic_init()
+{
+	NVIC_InitTypeDef nvic_init_structure;
+	nvic_init_structure.NVIC_IRQChannel = USART1_IRQn;
+	nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
+	nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 1;
+	NVIC_Init(&nvic_init_structure);
+}
+void sim_uart_init()
+{
+	sim_uart_clk_init();
+	sim_uart_gpio_init();
+	sim_uart_nvic_init();
+	sim_uart_module_init();
+}
+/*	Function for Sim800 Usart */
+
+/**
+  * @brief  Clear uart buffer of sim800
+  * @param 	None
+  * @retval None
+  */
+void sim_uart_clear_buffer()
+{
+	for (int i=0;i<SIM_BUFFER_SIZE;i++) sim_buffer[i]=0;
+	sim_buffer_index=0;
+}
+/**
+  * @brief  Send a string to uart
+  * @param 	str : Pointer to String or Array.
+  * @retval None
+  */
+void sim_uart_send_string(char *str)
+{
+	while(*str)
+	{
+		while(USART_GetFlagStatus(SIM_UART,USART_FLAG_TXE) == RESET);
+		USART_SendData(SIM_UART,*str);
+		str++;
+	}
+}
+/**
+  * @brief  Send a char to uart
+  * @param 	chr: char need to send
+  * @retval None
+  */
+void sim_uart_send_char( char chr)
+{
+	while(USART_GetFlagStatus(SIM_UART,USART_FLAG_TXE) == RESET);
+	USART_SendData(SIM_UART,chr);
+}
+/**
+  * @brief  Send array data to uart
+  * @param 	str: pointer to array.
+  * @param	length: data length
+  * @retval None
+  */
+void sim_uart_send_array(unsigned char *str, uint8_t length)
+{
+	for(int i=0;i<length;i++)
+	{
+		while(USART_GetFlagStatus(SIM_UART,USART_FLAG_TXE) == RESET);
+		USART_SendData(SIM_UART,*(str+i));
+	}
+}
+
 static void toggle_powerkey()
 {
 	GPIO_ResetBits(GPIOC, GSM_POWERKEY);
@@ -131,14 +233,20 @@ void sim_power_off(SIM800_t *sim800)
 #endif
 	}
 }
+/**
+  * @brief  Send Command to SIM800
+  * @param 	cmd: AT Command need to send.
+  * @param	ms: time_out(millisecond)
+  * @retval None
+  */
 void sim_send_cmd(char* cmd, uint16_t ms)
 {
 #if _DEBUG && _DEBUG_AT_CMD	//Gui len CMD ra man hinh debug
 	trace_write((char*)"cmd:", strlen("cmd:"));
 	trace_puts((char*)cmd);
 #endif
-	USART_clear_buf(1);
-	USART1_Send_String(cmd);
+	sim_uart_clear_buffer();
+	sim_uart_send_string(cmd);
 	delay_ms(ms);
 #if _DEBUG && _DEBUG_AT_CMD	//gui phan hoi cua sim len man hinh Debug
 	trace_write((char*)"res:", strlen("res:"));
@@ -149,6 +257,13 @@ void sim_send_cmd(char* cmd, uint16_t ms)
 #endif
 
 }
+/**
+  * @brief  Check Respond data from SIM800
+  * @param 	response: Pointer to uart_buffer - data from SIM800
+  * @param	cmd: Pointer to string ( Command to check)
+  * @retval	True: If find cmd in response
+  * 		False: Can not find cmd in response
+  */
 static uint8_t sim_check_cmd(char* response, char* cmd)
 {
 	char *res;
@@ -156,6 +271,11 @@ static uint8_t sim_check_cmd(char* response, char* cmd)
 	if (res) return 1;
 	else return 0;
 }
+/**
+  * @brief  Send Log to Debug terminal / uart5
+  * @param 	log: Pointer to string need to log
+  * @retval	None
+  */
 static void sim_log(char* log)
 {
 #if	_DEBUG
@@ -184,7 +304,7 @@ static uint8_t sim_check_response(char num_try, int timeout_ms)
 		sim_log("Check SIM Response.");
 		sim_send_cmd((char*)"AT\r\n", 100);
 		do{
-			r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
+			r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n");
 			time_out++;
 			delay_ms(100);
 		}while ((time_out<(timeout_ms/100))&&(!r));
@@ -216,7 +336,7 @@ static uint8_t sim_check_simcard(char num_try, int timeout_ms)
 		time_out = 0;
 		sim_send_cmd((char*)"AT+CPIN?\r\n", 100);
 		do{
-			r = sim_check_cmd((char*)RxBuffer1, (char*)"+CPIN: READY\r\n");
+			r = sim_check_cmd((char*)sim_buffer, (char*)"+CPIN: READY\r\n");
 			time_out++;
 			delay_ms(100);
 		}while ((time_out<(timeout_ms/100))&&(!r));
@@ -242,12 +362,12 @@ signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms)
 	char *temp;
 	char signal_str[3]={0};
 	do {
-		r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
+		r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n");
 		time_out++;
 		delay_ms(50);
 	}while ((time_out<(timeout_ms/50))&&(!r));
 	if (time_out>=(timeout_ms/50)) return NORESPONSE;
-	temp = strstr((char*)RxBuffer1,(char*)"+CSQ:");
+	temp = strstr((char*)sim_buffer,(char*)"+CSQ:");
 	if (temp!=NULL)
 	{
 		signal_str[0]=*(temp+6);
@@ -270,9 +390,9 @@ void sim_get_id(SIM800_t *sim800)
 	//Get IMEI
 	sim_send_cmd((char*)"AT+GSN\r\n", 100);
 	do {
-		r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
+		r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n");
 	}while (!r);
-	for (i=2;i<17;i++)temp[index++]=RxBuffer1[i];
+	for (i=2;i<17;i++)temp[index++]=sim_buffer[i];
 	strcpy(sim800->sim_id.imei,temp);
 	delay_ms(100);
 }
@@ -292,7 +412,7 @@ static uint8_t sim_check_reg(char num_try, int timeout_ms)
 		time_out = 0;
 		sim_send_cmd((char*)"AT+CREG?\r\n", 100);
 		do{
-			r = sim_check_cmd((char*)RxBuffer1, (char*)"+CREG: 0,1\r\n");
+			r = sim_check_cmd((char*)sim_buffer, (char*)"+CREG: 0,1\r\n");
 			time_out++;
 			delay_ms(100);
 		}while ((time_out<(timeout_ms/100))&&(!r));
@@ -323,7 +443,7 @@ uint8_t sim_attach_gprs(char num_try, int timeout_ms)
 		time_out = 0;
 		sim_send_cmd((char*)"AT+CGATT=1\r\n", 200);
 		do{
-			r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
+			r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n");
 			delay_ms(100);
 			time_out++;
 		}while ((time_out<(timeout_ms/100))&&(!r));
@@ -353,7 +473,7 @@ uint8_t sim_detach_gprs(char num_try, int timeout_ms)
 		time_out = 0;
 		sim_send_cmd((char*)"AT+CIPSHUT\r\n", 200);
 		do{
-			r = sim_check_cmd((char*)RxBuffer1, (char*)"SHUT OK\r\n");
+			r = sim_check_cmd((char*)sim_buffer, (char*)"SHUT OK\r\n");
 			delay_ms(100);
 			time_out++;
 		}while ((time_out<(timeout_ms/100))&&(!r));
@@ -382,7 +502,7 @@ static uint8_t sim_set_APN(SIM800_t *sim800, char num_try, int timeout_ms)
 		snprintf(str,sizeof(str),"AT+CSTT=\"%s\",\"%s\",\"%s\"\r\n",sim800->sim.apn,sim800->sim.apn_user,sim800->sim.apn_pass);
 		sim_send_cmd((char*)str, 200);
 		do{
-			r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
+			r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n");
 			delay_ms(100);
 			time_out++;
 		}while ((time_out<(timeout_ms/100))&&(!r));
@@ -408,7 +528,7 @@ static uint8_t sim_bringup_wireless_connection(char num_try, int timeout_ms)
 		sim_log("Bring up wireless connection.");
 		sim_send_cmd((char*)"AT+CIICR\r\n", 100);
 		do{
-			r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n");
+			r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n");
 			time_out++;
 			delay_ms(100);
 		}while ((time_out<(timeout_ms/100))&&(!r));
@@ -428,7 +548,6 @@ static uint8_t sim_get_local_IP(char num_try, int timeout_ms)
 	u8 time_out=0;
 	u8 r=0;
 	u8 repeat=0;
-//	char *buff=(char*)malloc(40*sizeof(char));
 	char buff[40]={0};
 	for (repeat=0;repeat<num_try;repeat++)
 	{
@@ -436,7 +555,7 @@ static uint8_t sim_get_local_IP(char num_try, int timeout_ms)
 		sim_log("Get Local IP Address.");
 		sim_send_cmd((char*)"AT+CIFSR\r\n",100);
 		do{
-			r = sim_check_cmd((char*)RxBuffer1, (char*)"ERROR\r\n");
+			r = sim_check_cmd((char*)sim_buffer, (char*)"ERROR\r\n");
 			time_out++;
 			delay_ms(100);
 		}while ((time_out<(timeout_ms/100))&&(r));
@@ -445,9 +564,8 @@ static uint8_t sim_get_local_IP(char num_try, int timeout_ms)
 		}
 		else {
 			memset(buff,0,40);
-			sprintf((char*)buff,"Your Local IP Address: %s",RxBuffer1);
+			sprintf((char*)buff,"Your Local IP Address: %s",sim_buffer);
 			sim_log((char*)buff);
-//			free(buff);
 			return 1;
 		}
 	}
@@ -465,6 +583,7 @@ uint8_t sim_init(SIM800_t *sim800)
 {
 	char max_try = 10;
 	int time_out_ms  = 3000;
+	sim_uart_init();
 	if (!sim_power_on(sim800)) {
 		sim800->sim_err = NO_PWR;
 		return 0;
@@ -541,10 +660,10 @@ uint8_t sim_send_message(unsigned char* message, uint8_t datalen)
 	u8 time_out=0;
 	u8 r=0;
 	sim_send_cmd((char*)"AT+CIPSEND\r\n", 50);
-	USART1_Send_Array(message, datalen);
-	USART1_Send_Char(0x1A);
+	sim_uart_send_array(message, datalen);
+	sim_uart_send_char(0x1A);
 	do{
-		r = sim_check_cmd((char*)RxBuffer1, (char*)"DATA ACCEPT");
+		r = sim_check_cmd((char*)sim_buffer, (char*)"DATA ACCEPT");
 		time_out++;
 		delay_ms(50);
 	}
@@ -567,7 +686,6 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 	u8 time_out=0;
 	u8 r=0;
 	u8 repeat = 0;
-//	char *buff=(char*)malloc(128*sizeof(char));
 	char buff[128]={0};
 	memset(buff,0,128);
 	sprintf((char*)buff,"Start connecting to: %s:%d",sim800->mqttServer.host,sim800->mqttServer.port);
@@ -579,7 +697,7 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 		sim_send_cmd((char*)buff, 200);
 		time_out = 0;
 		do{
-			r = sim_check_cmd((char*)RxBuffer1, (char*)"OK\r\n\r\nCONNECT OK");
+			r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n\r\nCONNECT OK");
 			delay_ms(100);
 			time_out++;
 		}while ((time_out<(timeout_ms/100))&&(!r));
@@ -612,19 +730,19 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 
 state sim_current_connection_status()
 {
-	USART_clear_buf(1);
-	USART1_Send_String((char*)"AT+CIPSTATUS\r\n");
+	sim_uart_clear_buffer();
+	sim_uart_send_string((char*)"AT+CIPSTATUS\r\n");
 	delay_ms(500);
-	if (sim_check_cmd((char*)RxBuffer1, (char*)"IP INITIAL\r\n")) return IP_INITIAL;
-	if (sim_check_cmd((char*)RxBuffer1, (char*)"IP START\r\n")) return IP_START ;
-	if (sim_check_cmd((char*)RxBuffer1, (char*)"IP CONFIG\r\n")) return IP_CONFIG ;
-	if (sim_check_cmd((char*)RxBuffer1, (char*)"IP GPRSACT\r\n")) return IP_GPRSACT;
-	if (sim_check_cmd((char*)RxBuffer1, (char*)"IP STATUS\r\n")) return IP_STATUS;
-	if (sim_check_cmd((char*)RxBuffer1, (char*)"TCP CONNECTING")) return TCP_CONNECTING;
-	if (sim_check_cmd((char*)RxBuffer1, (char*)"CONNECT OK\r\n")) return CONNECT_OK;
-	if (sim_check_cmd((char*)RxBuffer1, (char*)"TCP CLOSING\r\n")) return TCP_CLOSING;
-	if (sim_check_cmd((char*)RxBuffer1, (char*)"TCP CLOSED\r\n")) return TCP_CLOSED;
-	if (sim_check_cmd((char*)RxBuffer1, (char*)"PDP DEACT\r\n")) return PDP_DEACT;
+	if (sim_check_cmd((char*)sim_buffer, (char*)"IP INITIAL\r\n")) return IP_INITIAL;
+	if (sim_check_cmd((char*)sim_buffer, (char*)"IP START\r\n")) return IP_START ;
+	if (sim_check_cmd((char*)sim_buffer, (char*)"IP CONFIG\r\n")) return IP_CONFIG ;
+	if (sim_check_cmd((char*)sim_buffer, (char*)"IP GPRSACT\r\n")) return IP_GPRSACT;
+	if (sim_check_cmd((char*)sim_buffer, (char*)"IP STATUS\r\n")) return IP_STATUS;
+	if (sim_check_cmd((char*)sim_buffer, (char*)"TCP CONNECTING")) return TCP_CONNECTING;
+	if (sim_check_cmd((char*)sim_buffer, (char*)"CONNECT OK\r\n")) return CONNECT_OK;
+	if (sim_check_cmd((char*)sim_buffer, (char*)"TCP CLOSING\r\n")) return TCP_CLOSING;
+	if (sim_check_cmd((char*)sim_buffer, (char*)"TCP CLOSED\r\n")) return TCP_CLOSED;
+	if (sim_check_cmd((char*)sim_buffer, (char*)"PDP DEACT\r\n")) return PDP_DEACT;
 	return DEFAUT;
 }
 /* Dong ket noi TCP
@@ -641,7 +759,7 @@ uint8_t sim_disconnect_server(SIM800_t* sim800)
 		time_out = 0;
 		sim_send_cmd((char*)"AT+CIPCLOSE\r\n", 1000);
 		do{
-			r = sim_check_cmd((char*)RxBuffer1, (char*)"CLOSE OK\r\n");
+			r = sim_check_cmd((char*)sim_buffer, (char*)"CLOSE OK\r\n");
 			time_out++;
 			delay_ms(100);
 		}while ((time_out<30)&&(!r));
@@ -742,8 +860,8 @@ uint8_t MQTT_Connect(SIM800_t *sim800){
 		datas.will.message.cstring = "lost";
 		int data_len = MQTTSerialize_connect(buf, sizeof(buf), &datas);
 		sim_send_cmd((char*)"AT+CIPSEND\r\n", 200);
-		USART1_Send_Array((unsigned char*)buf,data_len);
-		USART1_Send_Char(0x1A);
+		sim_uart_send_array((unsigned char*)buf,data_len);
+		sim_uart_send_char(0x1A);
 		delay_ms(500);
 		if (MQTT_PingReq(sim800)) return 1;
 		else return 0;
@@ -757,8 +875,8 @@ uint8_t MQTT_PingReq(SIM800_t *sim800)
 	USART_clear_buf(1);
 	PINGRESP_Flag = 0;
 	sim_send_cmd((char*)"AT+CIPSEND\r\n", 200);
-	USART1_Send_Array(ping_frame, 2);
-	USART1_Send_Char(0x1A);
+	sim_uart_send_array(ping_frame, 2);
+	sim_uart_send_char(0x1A);
 	while ((time_out<10)&&(PINGRESP_Flag==0)){
 		time_out++;
 		delay_ms(100);
@@ -816,10 +934,10 @@ void clearMqttBuffer(void) {
 
 void Sim800_RxCallBack(void) {
 	unsigned char c;
-	c = USART_ReceiveData(USART1);
+	c = USART_ReceiveData(SIM_UART);
 	if (c== 0xD0) PINGRESP_Flag = 1;
-	if (RxCounter1<BUFFER_SIZE1) RxBuffer1[RxCounter1++]=c;
-	else RxCounter1 = 0;
+	if (sim_buffer_index<SIM_BUFFER_SIZE) sim_buffer[sim_buffer_index++]=c;
+	else sim_buffer_index = 0;
 #if (QoS==0)
 	if (sim800->mqttServer.connect == 1 && c == 48 ) {
 	        mqtt_receive = 1;

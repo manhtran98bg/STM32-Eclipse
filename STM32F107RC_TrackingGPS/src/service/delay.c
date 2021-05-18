@@ -10,7 +10,7 @@ extern uint32_t uwTick;
 void delay_ms(uint32_t ms)
 {
 	msTicks=ms;
-          	while(msTicks);
+    while(msTicks);
 }
 void dUS_tim4(uint16_t uS)
 {

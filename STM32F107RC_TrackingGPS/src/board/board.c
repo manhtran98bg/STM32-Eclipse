@@ -22,6 +22,8 @@ void clk_init()
 	RCC_HCLKConfig(RCC_SYSCLK_Div1);
 	RCC_PCLK1Config(RCC_HCLK_Div2);
 	RCC_PCLK2Config(RCC_HCLK_Div1);
+	SystemCoreClockUpdate();
+	SysTick_Config(SystemCoreClock/1000);
 #else
 	RCC_DeInit();
 	RCC_HSICmd(DISABLE);

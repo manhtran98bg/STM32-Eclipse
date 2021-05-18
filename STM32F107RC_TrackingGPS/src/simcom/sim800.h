@@ -14,6 +14,17 @@
 #define _DEBUG_SIM_UART5	1
 #define _DEBUG_AT_UART5	0
 #define QoS	0
+
+/*----------------------------------------- Define USART1 ---------------------------------*/
+/* USART1 For SIM800C*/
+#define SIM_UART		USART1
+#define SIM_UART_CLK	RCC_APB2Periph_USART1
+#define SIM_UART_GPIO		GPIOA
+#define SIM_UART_GPIO_CLK	RCC_APB2Periph_GPIOA
+#define SIM_UART_GPIO_TX	GPIO_Pin_9
+#define SIM_UART_GPIO_RX	GPIO_Pin_10
+
+#define SIM_BUFFER_SIZE	1460
 typedef enum {
 	IP_INITIAL,
 	IP_START,
@@ -96,8 +107,17 @@ typedef struct {
 	sim_id_t sim_id;
 	error_t	sim_err;
 } SIM800_t;
+
+extern __IO char RxBuffer1[];
+extern __IO uint16_t RxCounter1;
 extern SIM800_t *sim800;
+extern MQTTString topicString[];
+
+extern char sim_buffer[];
+extern uint16_t sim_buffer_index;
+
 void sim_gpio_init();
+
 uint8_t sim_power_status(SIM800_t *sim800);
 uint8_t sim_power_on(SIM800_t *sim800);
 void sim_power_off(SIM800_t *sim800);
@@ -118,4 +138,5 @@ void MQTT_Pub(char *topic, char *payload);
 void MQTT_Sub(MQTTString *topicString, int *requestedQoSs, int topic_count) ;
 uint8_t MQTT_Connect(SIM800_t *sim800);
 uint8_t MQTT_PingReq(SIM800_t *sim800);
+void Sim800_RxCallBack();
 #endif /* SIMCOM_SIM800_H_ */

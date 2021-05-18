@@ -14,6 +14,8 @@ typedef struct{
 	uint8_t second;
 	uint8_t old_minute;
 }RTC_Time_t;
+extern RTC_Time_t Time;
+extern char time_buffer[];
 void RTC_Init();
 void RTC_NVIC_Config();
 void RTC_ClockConfig();

@@ -6,11 +6,10 @@
  */
 
 #include "gps.h"
-__IO uint8_t flagStart = 0,flagStop = 0;
-extern __IO uint8_t RxBuffer4[];
-extern __IO uint8_t RxCounter4;
-extern char dmaRxbuffer[];
-extern char json_geowithtime[];
+uint8_t flagStart = 0,flagStop = 0;
+char gps_buffer[GPS_BUFFER_SIZE];
+uint16_t gps_buffer_index = 0;
+
 void gps_power_on()
 {
 	power_on_gps();
@@ -35,40 +34,211 @@ static void gps_rst_pin_init()
 	GPIO_Init(GPS_RST_PORT, &GPIO_InitStruct);
 	GPIO_ResetBits(GPS_RST_PORT, GPS_RST_PIN);
 }
+static void gps_uart_clk_init()
+{
+	/*Enable UART clock and GPIO clock*/
+	RCC_APB1PeriphClockCmd(GPS_UART_CLK, ENABLE);
+	RCC_APB2PeriphClockCmd(GPS_UART_GPIO_CLK, ENABLE);
+}
+static void gps_uart_gpio_init()
+{
+	GPIO_InitTypeDef gpio_init_structure;
+	//Config UART4: PC10 = TX, PC11 = RX
+	gpio_init_structure.GPIO_Pin = GPS_UART_GPIO_TX;
+	gpio_init_structure.GPIO_Mode = GPIO_Mode_AF_PP;
+	gpio_init_structure.GPIO_Speed = GPIO_Speed_50MHz;
+	GPIO_Init(GPS_UART_GPIO, &gpio_init_structure);
+	gpio_init_structure.GPIO_Pin = GPS_UART_GPIO_RX;
+	gpio_init_structure.GPIO_Mode = GPIO_Mode_IPU;
+	GPIO_Init(GPS_UART_GPIO, &gpio_init_structure);
+}
+static void gps_uart_nvic_init()
+{
+	NVIC_InitTypeDef nvic_init_structure;
+	nvic_init_structure.NVIC_IRQChannel = UART4_IRQn;
+	nvic_init_structure.NVIC_IRQChannelCmd = ENABLE;
+	nvic_init_structure.NVIC_IRQChannelPreemptionPriority = 2;
+	NVIC_Init(&nvic_init_structure);
+}
+static void gps_uart_module_init(uint32_t baudrate)
+{
+	USART_InitTypeDef usart_init_structure;
+	/* Baud rate = baudrate, 8-bit data, One stop bit
+	* No parity, Do both Rx and Tx, No HW flow control
+	*/
+	USART_DeInit(GPS_UART);
+	usart_init_structure.USART_BaudRate = baudrate;
+	usart_init_structure.USART_Mode = USART_Mode_Tx|USART_Mode_Rx;
+	usart_init_structure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	usart_init_structure.USART_Parity = USART_Parity_No;
+	usart_init_structure.USART_StopBits = USART_StopBits_1;
+	usart_init_structure.USART_WordLength = USART_WordLength_8b;
+	USART_Init(GPS_UART, &usart_init_structure);
+	/* Enable RXNE interrupt */
+	USART_ITConfig(GPS_UART, USART_IT_RXNE, ENABLE);
+	/*Enable USART	 */
+	USART_Cmd(GPS_UART, ENABLE);
+}
+void gps_check_current_baud()
+{
+	uint32_t baud[2]={115200,9600};
+	uint32_t time_out=0;
+	char buff_log[20]={0};
+	int i = 0;
+	//Check current baudrate of gps l70
+#if _DEBUG
+	trace_write((char*)"log:", strlen("log:"));
+	trace_puts("check curren baudrate gps l70");
+#endif
+#if _DEBUG_UART5
+	UART5_Send_String("check curren baudrate gps l70:");
+#endif
+	for (i=0;i<2;i++)
+	{
+		gps_l70->gps_response = false;	//Defaut No Reponse
+		time_out = 0;
+		gps_uart_module_init(baud[i]);
+		while ((!gps_l70->gps_response)&&(time_out<10))
+		{
+			time_out++;
+			delay_ms(200);
+		}
+		if (gps_l70->gps_response) {
+#if _DEBUG
+			trace_write((char*)"log:", strlen("log:"));
+			sprintf(buff_log,"BAUD_RATE = %ld",baud[i]);
+			trace_puts(buff_log);
+#endif
+#if _DEBUG_UART5
+			sprintf(buff_log,"BAUD_RATE = %ld\n",baud[i]);
+			UART5_Send_String(buff_log);
+#endif
+			gps_l70->gps_baudrate = baud[i];
+			break;
+		}
+	}
+}
 void gps_init()
 {
 	gps_rst_pin_init();
 	gps_power_on();
 	gps_l70->gps_err = GPS_NO_RES;
-	delay_ms(1000);
-	UART4_Send_String((char*)"$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n");
-//	UART4_Send_String((char*)"$PMTK251,115200*1F\r\n");
-	USART_clear_buf(4);
+	gps_l70->gps_baudrate = 9600;	//Default Baudrate;
+	gps_l70->gps_state = GPS_INITING;
+	gps_uart_clk_init();
+	gps_uart_gpio_init();
+	gps_uart_nvic_init();
+	gps_check_current_baud();
+	if (gps_l70->gps_baudrate == 9600) {
+#if _DEBUG_UART5
+		UART5_Send_String("Change BAUD_RATE to 115200.\n");
+#endif
+		gps_set_baudrate(115200);
+		delay_ms(500);
+		gps_uart_clear_buffer();
+		gps_check_current_baud();
+	}
+	gps_uart_send_string((char*)"$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n");
+	delay_ms(100);
+	gps_uart_clear_buffer();
+	gps_l70->gps_state = GPS_INITED;
 }
-void gps_set_baudrate(int baud)
+/*	Function for gps l70 Usart */
+
+/**
+  * @brief  Clear uart buffer of sim800
+  * @param 	None
+  * @retval None
+  */
+void gps_uart_clear_buffer()
+{
+	for (int i=0;i<GPS_BUFFER_SIZE;i++) gps_buffer[i]=0;
+	gps_buffer_index=0;
+}
+/**
+  * @brief  Send a string to uart
+  * @param 	str : Pointer to String or Array.
+  * @retval None
+  */
+void gps_uart_send_string(char *str)
+{
+	while(*str)
+	{
+		while(USART_GetFlagStatus(GPS_UART,USART_FLAG_TXE) == RESET);
+		USART_SendData(GPS_UART,*str);
+		str++;
+	}
+}
+/**
+  * @brief  Send a char to uart
+  * @param 	chr: char need to send
+  * @retval None
+  */
+void gps_uart_send_char( char chr)
+{
+	while(USART_GetFlagStatus(GPS_UART,USART_FLAG_TXE) == RESET);
+	USART_SendData(GPS_UART,chr);
+}
+/**
+  * @brief  Send array data to uart
+  * @param 	str: pointer to array.
+  * @param	length: data length
+  * @retval None
+  */
+void gps_uart_send_array(unsigned char *str, uint8_t length)
+{
+	for(int i=0;i<length;i++)
+	{
+		while(USART_GetFlagStatus(GPS_UART,USART_FLAG_TXE) == RESET);
+		USART_SendData(GPS_UART,*(str+i));
+	}
+}
+
+void gps_set_baudrate(uint32_t baud)
 {
 	char cmdBuf[25];
-	sprintf(cmdBuf,"$PMTK251,%d*1F\r\n",baud);
-	UART4_Send_String(cmdBuf);
+	sprintf(cmdBuf,"$PMTK251,%ld*1F\r\n",baud);
+	gps_uart_send_string(cmdBuf);
 }
 uint8_t  gps_read_data(gps_t *gps)
 {
 	if (flagStop)
 	{
-		RMC_Parse(&gps->RMC, (char*)RxBuffer4, RxCounter4);
-		RMC_json_init(&gps->RMC, json_geowithtime);
 #if _DEBUG
-		trace_puts((char*)RxBuffer4);
+		trace_puts((char*)gps_buffer);
 #endif
 #if _DEBUG_GPS_UART5
-		UART5_Send_String((char*)RxBuffer4);
+		UART5_Send_String((char*)gps_buffer);
 		USART_SendData(UART5, '\n');
 #endif
-		USART_clear_buf(4);
+		gps_uart_clear_buffer();
 		flagStop=0;
 		return 1;
 	}
 	return 0;
+}
+void gps_RxCallback(){
+	unsigned char c;
+	c = USART_ReceiveData(GPS_UART);
+	if (c=='$') {	//Start NMEA Sentence
+		flagStart = 1;	//Flag indicate Start of NMEA Sentence
+		gps_buffer_index = 0;
+		flagStop = 0;	//Flag indicate End of NMEA Sentence
+		gps_l70->gps_response = true;
+	}
+	if (c=='\n') {
+		flagStart = 0;
+		flagStop = 1;
+		if (gps_l70->gps_state == GPS_INITED){
+			RMC_Parse(&gps_l70->RMC, (char*)gps_buffer, gps_buffer_index);
+			RMC_json_init(&gps_l70->RMC, json_geowithtime);
+		}
+		gps_l70->gps_err = GPS_NO_ERR;
+	}
+	if (flagStart){
+		if (gps_buffer_index<GPS_BUFFER_SIZE) gps_buffer[gps_buffer_index++]=c;	//Save Data to gps_buffer
+		else gps_buffer_index = 0;
+	}
 }
 static bool RMC_GetDate(RMC_Data *RMC, char *Date_str)
 {
@@ -233,43 +403,4 @@ bool RMC_Parse(RMC_Data *RMC, char *RMC_Sentence, int RMC_len)
         k++;
     }
     return true;
-}
-void DMA_Receive_Datapack(void)
-{
-	static size_t old_pos;
-	size_t pos;
-	/* Calculate current position in buffer */
-	pos = 512 - DMA_GetCurrDataCounter(DMA2_Channel3);
-	if (pos != old_pos) { /* Check change in received data */
-		if (pos > old_pos) { /* Current position is over previous one */
-			/* We are in "linear" mode */
-			/* Process data directly by subtracting "pointers" */
-			usart_process_data(&dmaRxbuffer[old_pos], pos - old_pos);
-		} else {
-			/* We are in "overflow" mode */
-			/* First process data to the end of buffer */
-			usart_process_data(&dmaRxbuffer[old_pos], 512 - old_pos);
-			/* Check and continue with beginning of buffer */
-			if (pos > 0) {
-				usart_process_data(&dmaRxbuffer[0], pos);
-			}
-		}
-		old_pos = pos;                          /* Save current position as old */
-	}
-}
-void usart_process_data(const void* data, size_t len) {
-	const uint8_t* d = data;
-	char tmp[128]={0};
-    /*
-     * This function is called on DMA TC and HT events, aswell as on UART IDLE (if enabled) line event.
-     *
-     * For the sake of this example, function does a loop-back data over UART in polling mode.
-     * Check ringbuff RX-based example for implementation with TX & RX DMA transfer.
-     */
-		for (int i=0;i<len;i++)
-		{
-			tmp[i]=*d;
-			d++;
-		}
-		trace_puts(tmp);
 }

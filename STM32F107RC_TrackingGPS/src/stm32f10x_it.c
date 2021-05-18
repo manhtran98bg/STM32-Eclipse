@@ -8,15 +8,9 @@
 volatile uint32_t msTicks=0;
 volatile uint32_t myTicks_tim4=0;
 uint32_t uwTick=0;
-extern __IO char RxBuffer5[];
-extern __IO uint8_t RxCounter5;
 
-extern __IO char RxBuffer4[];
-extern __IO uint8_t RxCounter4;
-extern __IO uint8_t flagStart,flagStop;
-extern char json_geowithtime[];
-extern char time_buffer[];
-extern RTC_Time_t Time;
+
+
 bool flagRx5=0;
 extern bool _1sflag;
 void NMI_Handler(void)
@@ -82,40 +76,10 @@ void UART5_IRQHandler(void)
 }
 void UART4_IRQHandler(void)
 {
-	uint8_t c;
-#if !_USE_DMA
-	if(USART_GetITStatus(UART4, USART_IT_RXNE) != RESET)
+	if(USART_GetITStatus(GPS_UART, USART_IT_RXNE) != RESET)
 	{
-		c = USART_ReceiveData(UART4);
-		if (c=='$') {	//Start NMEA Sentence
-			flagStart = 1;	//Flag indicate Start of NMEA Sentence
-			RxCounter4 = 0;
-			flagStop = 0;	//Flag indicate End of NMEA Sentence
-		}
-		if (c=='\n') {
-			flagStart = 0;
-			flagStop = 1;
-			RMC_Parse(&gps_l70->RMC, (char*)RxBuffer4, RxCounter4);
-			RMC_json_init(&gps_l70->RMC, json_geowithtime);
-			gps_l70->gps_err = GPS_NO_ERR;
-		}
-		if (flagStart){
-			if (RxCounter4<BUFFER_SIZE4) RxBuffer4[RxCounter4++]=c;	//Save Data to RxBuffer4
-			else RxCounter4 = 0;
-		}
-
+		gps_RxCallback();
 	}
-#else
-	if (USART_GetITStatus(UART4, USART_IT_IDLE)!=RESET)
-	{
-		DMA_Receive_Datapack();
-		trace_puts("IDLE");
-	}
-#endif
-}
-void DMA2_Channel3_IRQHandler()
-{
-
 }
 void USART1_IRQHandler(void)
 {
