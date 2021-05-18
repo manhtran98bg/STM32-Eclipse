@@ -11,6 +11,8 @@
 #include "main.h"
 #include "../power/power.h"
 #include "../usart/usart.h"
+#include "../simcom/sim800.h"
+#include "../sdcard/ff.h"
 #define _DEBUG_GPS_UART5 1
 /*----------------------------------------- Define UART4 ----------------------------------*/
 #define GPS_RST_CLK		RCC_APB2Periph_GPIOC

@@ -584,7 +584,7 @@ uint8_t sim_init(SIM800_t *sim800)
 	char max_try = 10;
 	int time_out_ms  = 3000;
 	sim_uart_init();
-	if (!sim_power_on(sim800)) {
+	if (sim800->power_state==OFF) {
 		sim800->sim_err = NO_PWR;
 		return 0;
 	}
@@ -611,7 +611,7 @@ uint8_t sim_init(SIM800_t *sim800)
 		return 0;
 	}
 	sim_send_cmd((char*)"AT+CIPQSEND=1\r\n", 1000);
-	delay_ms(2000);
+	delay_ms(1000);
 	USART_clear_buf(1);
 	sim800->sim_err = NO_ERR;
 	return 1;

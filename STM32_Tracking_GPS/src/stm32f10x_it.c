@@ -94,7 +94,10 @@ void RTC_IRQHandler(void)
 	{
 		/* Clear the RTC Second interrupt */
 		RTC_ClearITPendingBit(RTC_IT_SEC);
-		RTC_GetTime(&Time);
+		time_struct = convert_time_stamp(RTC_GetCounter());
+		Time.second = time_struct.tm_sec;
+		Time.minute = time_struct.tm_min;
+		Time.hour = time_struct.tm_hour;
 		if (Time.minute<10) sprintf(time_buffer,"%d:0%d",Time.hour,Time.minute);
 		else sprintf(time_buffer,"%d:%d",Time.hour,Time.minute);
 		if (Time.old_minute != Time.minute){

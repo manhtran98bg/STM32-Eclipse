@@ -11,6 +11,7 @@
 #include "rtc/rtc.h"
 #include "lcd/sh1106.h"
 #include "board/board.h"
+#include "time.h"
 // ----------------------------------------------------------------------------
 
 #pragma GCC diagnostic push
@@ -30,6 +31,9 @@ SIM800_t *sim800;
 gps_t *gps_l70;
 RTC_Time_t Time;
 MQTTString topicString[20] = MQTTString_initializer;
+FATFS	FatFs;
+FIL	Fil;
+struct tm time_struct;
 char RMC_test[]="$GPRMC,104100.000,A,2059.6764,N,10552.0151,E,10.34,0.00,100521,,,A*68\r\n";
 int requestedQoSs[3]={0,0,0};
 uchar serNum[5];
@@ -41,9 +45,11 @@ char time_buffer[10]={0};
 uint32_t t_check_connection = 0;
 uint32_t t_lcd_update = 0;
 uint8_t nosignal_check = 0;
+uint8_t	gps_data_count = 0;
 bool _1sflag = false;
 #define _USE_SIM	1
 #define _USE_LCD	0
+#define _USE_SDCARD	1
 //#define _USE_TEST_RMC
 //#define _USE_DS18B20
 // ----------------------------------------------------------------------------
@@ -73,7 +79,6 @@ int main(int argc, char* argv[])
 	RMC_json_init(&gps_l70->RMC, json_geowithtime);
 #endif
 	board_init();
-	RTC_GetTime(&Time);
 #ifdef _USE_DS18B20
 	ds18_config(RES_9BIT);
 #endif
@@ -100,11 +105,17 @@ int main(int argc, char* argv[])
 		}
 		if (millis()-t_lcd_update>2000)
 		{
+#ifdef _USE_DS18B20
 			ds18_read_temp(&ds18b20);
-			sprintf(payload_buf,"%d",(int)ds18b20.temp);
+
+#else
+			ds18b20.temp = 25;
+#endif
+
 #if _USE_LCD
 			lcd_update();
 #endif
+			sprintf(payload_buf,"%d",(int)ds18b20.temp);
 			t_lcd_update = millis();
 		}
 #if _USE_SIM
@@ -139,8 +150,8 @@ int main(int argc, char* argv[])
 				sim800->signal_condition = sim_check_signal_condition(sim800, 200);
 				if (sim800->mqttServer.connect)	{
 					if (gps_l70->RMC.Data_Valid[0]!='V') MQTT_Pub(topicString[11].cstring,json_geowithtime);
-					MQTT_Pub(topicString[12].cstring,payload_buf);
-					MQTT_Pub(topicString[7].cstring,sim800->rssi);
+					MQTT_Pub(topicString[12].cstring,payload_buf);	//Temp Device
+					MQTT_Pub(topicString[7].cstring,sim800->rssi);	//RSSI
 				}
 			}
 		}
@@ -361,13 +372,7 @@ static void lcd_update(){
 }
 static void gps_start()
 {
-	if (sim800->power_state == OFF) {
-		gps_l70->gps_err = GPS_NO_PWR;
-		gps_l70->gps_pwr_state = false;
-	}
-	else {
-		gps_l70->gps_pwr_state = true;
-	}
+
 #if _USE_LCD
 	sh1106_WriteString(2, 40, "CHECK_GPS", Font_6x8, White, ALIGN_LEFT);
 #endif
@@ -393,6 +398,37 @@ static void gps_start()
 		return;
 	}
 }
+static void sdcard_check()
+{
+	TCHAR label[10];
+	DWORD	vsn;
+	UINT	bw;
+	FRESULT	fr;
+	char log[30]={0};
+	fr = f_mount(&FatFs, "", 1);
+	if(fr == FR_OK){
+		f_getlabel("", label, &vsn);
+		sprintf(log,"Mount SDCard OK. Label=%s. Serial Number=%ld",label,vsn);
+#if	_DEBUG
+		trace_write((char*)"log:", strlen("log:"));
+		trace_puts(log);
+#endif
+#if _DEBUG_UART5
+		UART5_Send_String(log);
+		UART5_Send_String((char*)"\n");
+#endif
+	}
+	else {
+#if	_DEBUG
+		trace_write((char*)"log:", strlen("log:"));
+		trace_puts("Mount SDCard Fail.");
+#endif
+#if _DEBUG_SIM_UART5
+		UART5_Send_String("Mount SDCard Fail.\n");
+#endif
+	}
+
+}
 static void board_init()
 {
 	clk_init();
@@ -405,7 +441,11 @@ static void board_init()
 	sim_power_off(sim800);
 	usart_init();
 	MFRC522_Init();
+	sdcard_check();
+	sim_power_on(sim800);
 	gps_init();
+#if _USE_SDCARD
+#endif
 }
 #pragma GCC diagnostic pop
 
