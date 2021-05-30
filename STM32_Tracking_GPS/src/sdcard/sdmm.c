@@ -1,92 +1,18 @@
-/*------------------------------------------------------------------------/
-/  Foolproof MMCv3/SDv1/SDv2 (in SPI mode) control module
-/-------------------------------------------------------------------------/
-/
-/  Copyright (C) 2019, ChaN, all right reserved.
-/
-/ * This software is a free software and there is NO WARRANTY.
-/ * No restriction on use. You can use, modify and redistribute it for
-/   personal, non-profit or commercial products UNDER YOUR RESPONSIBILITY.
-/ * Redistributions of source code must retain the above copyright notice.
-/
-/-------------------------------------------------------------------------/
-  Features and Limitations:
+#include "sdmm.h"
 
-  * Easy to Port Bit-banging SPI
-    It uses only four GPIO pins. No complex peripheral needs to be used.
+static DSTATUS Stat = STA_NOINIT;	/* Disk status */
 
-  * Platform Independent
-    You need to modify only a few macros to control the GPIO port.
+static BYTE CardType;			/* b0:MMC, b1:SDv1, b2:SDv2, b3:Block addressing */
+sd_t sdcard;
+char directory[128]={0};
+char sd_buffer[128]={0};	//Mang luu van toc theo thoi gian de ghi vao the SD
 
-  * Low Speed
-    The data transfer rate will be several times slower than hardware SPI.
-
-  * No Media Change Detection
-    Application program needs to perform a f_mount() after media change.
-
-/-------------------------------------------------------------------------*/
-
-
-#include "ff.h"		/* Obtains integer types for FatFs */
-#include "diskio.h"	/* Common include file for FatFs and disk I/O layer */
-
-
-/*-------------------------------------------------------------------------*/
-/* Platform dependent macros and functions needed to be modified           */
-/*-------------------------------------------------------------------------*/
-
-#include "spi.h"		/* Include device specific declareation file here */
-
-#define	CS_H()		GPIO_SetBits(SD_SPI_GPIO, SD_SPI_CS)	/* Set MMC CS "high" */
-#define CS_L()		GPIO_ResetBits(SD_SPI_GPIO, SD_SPI_CS)	/* Set MMC CS "low" */
-
-
-static
-void dly_us (UINT n)	/* Delay n microseconds (avr-gcc -Os) */
+extern FATFS	FatFs;
+extern FIL	Fil;
+static void dly_us (UINT n)	/* Delay n microseconds  */
 {
 	dUS_tim4(n);
 }
-
-
-
-/*--------------------------------------------------------------------------
-
-   Module Private Functions
-
----------------------------------------------------------------------------*/
-
-/* MMC/SD command (SPI mode) */
-#define CMD0	(0)			/* GO_IDLE_STATE */
-#define CMD1	(1)			/* SEND_OP_COND */
-#define	ACMD41	(0x80+41)	/* SEND_OP_COND (SDC) */
-#define CMD8	(8)			/* SEND_IF_COND */
-#define CMD9	(9)			/* SEND_CSD */
-#define CMD10	(10)		/* SEND_CID */
-#define CMD12	(12)		/* STOP_TRANSMISSION */
-#define CMD13	(13)		/* SEND_STATUS */
-#define ACMD13	(0x80+13)	/* SD_STATUS (SDC) */
-#define CMD16	(16)		/* SET_BLOCKLEN */
-#define CMD17	(17)		/* READ_SINGLE_BLOCK */
-#define CMD18	(18)		/* READ_MULTIPLE_BLOCK */
-#define CMD23	(23)		/* SET_BLOCK_COUNT */
-#define	ACMD23	(0x80+23)	/* SET_WR_BLK_ERASE_COUNT (SDC) */
-#define CMD24	(24)		/* WRITE_BLOCK */
-#define CMD25	(25)		/* WRITE_MULTIPLE_BLOCK */
-#define CMD32	(32)		/* ERASE_ER_BLK_START */
-#define CMD33	(33)		/* ERASE_ER_BLK_END */
-#define CMD38	(38)		/* ERASE */
-#define CMD55	(55)		/* APP_CMD */
-#define CMD58	(58)		/* READ_OCR */
-
-
-static
-DSTATUS Stat = STA_NOINIT;	/* Disk status */
-
-static
-BYTE CardType;			/* b0:MMC, b1:SDv1, b2:SDv2, b3:Block addressing */
-
-
-
 /*-----------------------------------------------------------------------*/
 /* Transmit bytes to the card 				                             */
 /*-----------------------------------------------------------------------*/
@@ -489,5 +415,105 @@ DRESULT disk_ioctl (
 
 	return res;
 }
+FRESULT scan_files (
+    char* path        /* Start node to be scanned (***also used as work area***) */
+)
+{
+    FRESULT res;
+    DIR dir;
+    UINT i;
+    static FILINFO fno;
+    char buf[50]={0};
 
+    res = f_opendir(&dir, path);                       /* Open the directory */
+    if (res == FR_OK) {
+        for (;;) {
+            res = f_readdir(&dir, &fno);                   /* Read a directory item */
+            if (res != FR_OK || fno.fname[0] == 0) break;  /* Break on error or end of dir */
+            if (fno.fattrib & AM_DIR) {                    /* It is a directory */
+                i = strlen(path);
+                sprintf(&path[i], "/%s", fno.fname);
+                res = scan_files(path);                    /* Enter the directory */
+                if (res != FR_OK) break;
+                path[i] = 0;
+            } else {                                       /* It is a file. */
+                sprintf(buf,"%s/%s\n", path, fno.fname);
+                trace_puts(buf);
+            }
+        }
+        f_closedir(&dir);
+    }
+    return res;
+}
 
+FRESULT set_timestamp (
+    char *obj,     /* Pointer to the file name */
+    int year,
+    int month,
+    int mday,
+    int hour,
+    int min,
+    int sec
+)
+{
+    FILINFO fno;
+    fno.fdate = (WORD)(((year - 1980) * 512U) | month * 32U | mday);
+    fno.ftime = (WORD)(hour * 2048U | min * 32U | sec / 2U);
+    return f_utime(obj, &fno);
+}
+FRESULT	create_directory(char *directory, struct tm *time_struct){
+    FRESULT	fr;
+    FILINFO fno;
+    int i;
+//    sprintf(directory,"//DATALOG/%d0%d%d",time_struct->tm_year+1900,
+//    		time_struct->tm_mon,time_struct->tm_mday);
+    sprintf(directory,"//DATALOG/%d",time_struct->tm_year+1900);
+    i = strlen(directory);
+    if (time_struct->tm_mon<10) sprintf(&directory[i],"0%d",time_struct->tm_mon);
+    else sprintf(&directory[i],"%d",time_struct->tm_mon);
+    i = strlen(directory);
+    if (time_struct->tm_mday<10) sprintf(&directory[i],"0%d",time_struct->tm_mday);
+    else sprintf(&directory[i],"%d",time_struct->tm_mday);
+    fr = f_stat(directory, &fno);	//Check Directory Exist
+    if (fr == FR_OK){
+#if _DEBUG
+    	trace_puts("Directory Exist. Don't Create Directory");
+#endif
+    	return FR_EXIST;
+    }
+    else {
+#if _DEBUG
+    	trace_puts("Directory No Exist. Create Directory");
+#endif
+    	fr = f_mkdir(directory);
+    	if(fr == FR_OK){
+#if _DEBUG
+    		trace_write(directory, sizeof(directory));
+    		trace_puts(" => create OK");
+#endif
+    		set_timestamp(directory, time_struct->tm_year+1900, time_struct->tm_mon, time_struct->tm_mday,
+    				time_struct->tm_hour, time_struct->tm_min, time_struct->tm_sec);
+    	}
+    	else {
+#if _DEBUG
+    		trace_write(directory, sizeof(directory));
+    		trace_puts(" => create ERROR");
+#endif
+    	}
+    	return fr;
+    }
+}
+FRESULT write2file(char *directory,int dir_len, char *filename, char *content, int content_len)
+{
+	FRESULT fr;
+	UINT	bw;
+	char directory_buffer[128]={0};
+	memcpy(directory_buffer,directory,dir_len);
+	sprintf(&directory_buffer[dir_len],"/%s",filename);
+	fr = f_open(&Fil, directory_buffer, FA_WRITE|FA_OPEN_APPEND);
+	if (fr == FR_OK) {
+			f_write(&Fil,content,content_len, &bw);	/* Write data to the file */
+			fr = f_close(&Fil);
+	}
+	return fr;
+}

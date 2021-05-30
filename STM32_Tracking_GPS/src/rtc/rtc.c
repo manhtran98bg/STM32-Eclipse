@@ -7,7 +7,8 @@
 
 #include "rtc.h"
 const uint8_t daysInMonth [] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-
+char time_str[10]={0};				//Chuoi luu thoi gian dinh dang hh:mm:ss;
+int gps_data_count = 0;
 void RTC_Init()
 {
 	RTC_NVIC_Config();
@@ -168,6 +169,41 @@ struct tm convert_time_stamp(uint32_t t)
     time_struct.tm_hour = hh;
     time_struct.tm_min = mm;
     time_struct.tm_sec = ss;
-    mktime(&time_struct);
+//    mktime(&time_struct);
     return time_struct;
+}
+void date_time2str(char *buffer, struct tm *time_struct)
+{
+	char year[15]={0};
+	char mon[15]={0};
+	char day[15]={0};
+	char hour[15]={0};
+	char min[15]={0};
+	char sec[15]={0};
+	sprintf(year,"%d",time_struct->tm_year+1900);
+	if (time_struct->tm_mon<10) sprintf(mon,"0%d",time_struct->tm_mon);
+	else sprintf(mon,"%d",time_struct->tm_mon);
+	if (time_struct->tm_mday<10) sprintf(day,"0%d",time_struct->tm_mday);
+	else sprintf(day,"%d",time_struct->tm_mday);
+	if (time_struct->tm_hour<10) sprintf(hour,"0%d",time_struct->tm_hour);
+	else sprintf(hour,"%d",time_struct->tm_hour);
+	if (time_struct->tm_min<10) sprintf(min,"0%d",time_struct->tm_min);
+	else sprintf(min,"%d",time_struct->tm_min);
+	if (time_struct->tm_sec<10) sprintf(sec,"0%d",time_struct->tm_sec);
+	else sprintf(sec,"%d",time_struct->tm_sec);
+	sprintf(buffer,"%s-%s-%sT%s-%s-%s+07:00",year,mon,day,hour,min,sec);
+
+}
+/* Tao chuoi Time co dinh dang hh:mm:ss */
+void create_time_str(RTC_Time_t *time, char *time_str)
+{
+	uint8_t i = 0;
+	if (time->hour<10) sprintf(&time_str[0],"0%d:",time->hour);
+	else sprintf(&time_str[0],"%d:",time->hour);
+	i = strlen(time_str);
+	if (time->minute<10) sprintf(&time_str[i],"0%d:",time->minute);
+	else sprintf(&time_str[i],"%d:",time->minute);
+	i = strlen(time_str);
+	if (time->second<10) sprintf(&time_str[i],"0%d",time->second);
+	else sprintf(&time_str[i],"%d",time->second);
 }

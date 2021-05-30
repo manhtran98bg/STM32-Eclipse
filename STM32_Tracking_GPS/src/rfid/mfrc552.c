@@ -179,7 +179,7 @@ void MFRC522_Init(void)
 	GPIO_InitStructure.GPIO_Pin = MFRC522_RST_PIN;
 	GPIO_Init(MFRC522_RST_GPIO, &GPIO_InitStructure);
 	GPIO_SetBits(MFRC522_CS_GPIO,MFRC522_CS_PIN);
-	GPIO_SetBits(MFRC522_RST_GPIO,MFRC522_RST_PIN);
+//	GPIO_SetBits(MFRC522_RST_GPIO,MFRC522_RST_PIN);
 	// spi config
 	MFRC522_SPI_Init();
 	MFRC522_Reset();
@@ -190,9 +190,9 @@ void MFRC522_Init(void)
 	Write_MFRC522(TReloadRegH, 0);
 	Write_MFRC522(TxAutoReg, 0x40);		//100%ASK
 	Write_MFRC522(ModeReg, 0x3D);		//CRC Gia tri ban dau 0x6363	???
-	//ClearBitMask(Status2Reg, 0x08);		//MFCrypto1On=0
-	//Write_MFRC522(RxSelReg, 0x86);		//RxWait = RxSelReg[5..0]
-	//Write_MFRC522(RFCfgReg, 0x7F);   		//RxGain = 48dB
+	ClearBitMask(Status2Reg, 0x08);		//MFCrypto1On=0
+	Write_MFRC522(RxSelReg, 0x86);		//RxWait = RxSelReg[5..0]
+	Write_MFRC522(RFCfgReg, 0x7F);   		//RxGain = 48dB
 	AntennaOn();		//Mo Anten
 }
 /*
@@ -581,4 +581,16 @@ void MFRC522_Halt(void)
 
 	MFRC522_ToCard(PCD_TRANSCEIVE, buff, 4, buff,&unLen);
 }
-
+uint8_t MFRC522_RFID_Present(RFID_t RFID_Struct)
+{
+	int count;
+	int res;
+	uchar str[16];
+	for (int i=0;i<6;i++)
+	{
+		res = MFRC522_Request(PICC_REQIDL, str);
+		if (res==MI_OK) count++;
+		else count --;
+		delay_ms(100);
+	}
+}

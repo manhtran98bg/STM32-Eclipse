@@ -8,7 +8,7 @@
 #ifndef SDCARD_SPI_H_
 #define SDCARD_SPI_H_
 
-#include "main.h"
+#include "../main.h"
 #include "../service/delay.h"
 
 #define SD_SPI			SPI3

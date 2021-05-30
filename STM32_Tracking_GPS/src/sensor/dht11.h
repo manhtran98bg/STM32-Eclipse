@@ -7,7 +7,7 @@
 
 #ifndef SENSOR_DHT11_H_
 #define SENSOR_DHT11_H_
-#include "main.h"
+#include "../main.h"
 #include "../service/delay.h"
 
 typedef struct dht11_data{

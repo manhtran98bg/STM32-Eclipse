@@ -4,7 +4,8 @@
  *  Created on: May 11, 2021
  *      Author: manht
  */
-#include "main.h"
+#include <main.h>
+//board_t board;
 void clk_init()
 {
 #ifdef _STM32F103RCT6_
@@ -88,6 +89,7 @@ void user_led_toggle()
 void btn_init(){
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_AFIO, ENABLE);
+	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
 	GPIO_InitTypeDef gpio_init_struct;
 	EXTI_InitTypeDef exti_init_struct;
 	NVIC_InitTypeDef nvic_init_struct;
@@ -100,8 +102,9 @@ void btn_init(){
 	GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource13);
 	/* Connect EXTI14 Line to PB14 pin */
 	GPIO_EXTILineConfig(GPIO_PortSourceGPIOB, GPIO_PinSource14);
+
 	/* Configure EXTI line */
-	exti_init_struct.EXTI_Line = EXTI_Line12|EXTI_Line13|EXTI_Line14;
+	exti_init_struct.EXTI_Line = EXTI_Line12|EXTI_Line13|EXTI_Line14|EXTI_Line0;
 	exti_init_struct.EXTI_Mode = EXTI_Mode_Interrupt;
 	exti_init_struct.EXTI_Trigger = EXTI_Trigger_Falling;
 	exti_init_struct.EXTI_LineCmd = ENABLE;

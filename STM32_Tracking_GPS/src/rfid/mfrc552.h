@@ -7,7 +7,7 @@
 
 #ifndef RFID_MFRC552_H_
 #define RFID_MFRC552_H_
-#include "main.h"
+#include "../main.h"
 #define	uchar	unsigned char
 #define	uint	unsigned int
 
@@ -134,6 +134,12 @@
 #define     Reserved33            0x3E
 #define     Reserved34			  		0x3F
 //-----------------------------------------------
+typedef struct{
+	int t_out;		//Sec
+	bool present;
+	char	serialNumber[5];
+}RFID_t;
+extern RFID_t rfid;
 // Cac ham su dung
 void MFRC522_Init(void);
 uchar MFRC522_Request(uchar reqMode, uchar *TagType);

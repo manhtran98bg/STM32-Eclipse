@@ -8,7 +8,7 @@
 #ifndef I2C_SOFT_I2C_H_
 #define I2C_SOFT_I2C_H_
 
-#include "main.h"
+#include "../main.h"
 #include "../service/delay.h"
 
 #define SI2C_GPIO	GPIOB

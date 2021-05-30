@@ -7,18 +7,18 @@
 
 #ifndef SIMCOM_SIM800_H_
 #define SIMCOM_SIM800_H_
-#include <main.h>
 #include <string.h>
-#include "../mqtt/MQTTPacket.h"
-#define _DEBUG_AT_CMD 0
-#define _DEBUG_SIM_UART5	1
-#define _DEBUG_AT_UART5	0
-#define QoS	0
 
+#include "../main.h"
+#include "../mqtt/MQTTPacket.h"
+#define _DEBUG_AT_CMD 0		//Macro cho phep in AT command de DEBUG
+#define _DEBUG_RES	  0		//Macro cho phep in Response de DEBUG
+#define QoS	0
+#define NUM_SUB_TOPIC 6
 /*----------------------------------------- Define USART1 ---------------------------------*/
 /* USART1 For SIM800C*/
-#define SIM_UART		USART1
-#define SIM_UART_CLK	RCC_APB2Periph_USART1
+#define SIM_UART			USART1
+#define SIM_UART_CLK		RCC_APB2Periph_USART1
 #define SIM_UART_GPIO		GPIOA
 #define SIM_UART_GPIO_CLK	RCC_APB2Periph_GPIOA
 #define SIM_UART_GPIO_TX	GPIO_Pin_9
@@ -61,6 +61,24 @@ typedef struct{
 	char *manufacturer_id;
 	char imei[16];
 }sim_id_t;
+typedef enum{
+	SENDING = 0,
+	NO_SEND,
+	SENT,
+}send_state_t;
+
+//typedef enum{
+//	CONNECT,	CONNACK,
+//	PUBLISH,	PUBACK,		PUBREC,		PUBREL,		PUBCOMP,
+//	SUBSCRIBE,	SUBACK,
+//	UNSUBSCRIBE,	UNSUBACK,
+//	PINGREQ,	PINGRESP,
+//	DISCONNECT,
+//}packet_name;
+typedef struct{
+	unsigned int name;
+	bool	flag;
+}mqtt_packet;
 typedef struct {
     char *host;
     uint16_t port;
@@ -80,9 +98,9 @@ typedef struct {
     int qos;
     unsigned char retained;
     unsigned short msgId;
-    unsigned char payload[256];
+    unsigned char payload[32];
     int payloadLen;
-    unsigned char topic[64];
+    unsigned char topic[128];
     int topicLen;
 } mqttReceive_t;
 typedef enum{
@@ -106,16 +124,21 @@ typedef struct {
 	char rssi[4];
 	sim_id_t sim_id;
 	error_t	sim_err;
+	send_state_t send_state;	//State of Sending Message (AT+CIPSEND)
+	mqtt_packet	 send_packet;
+	mqtt_packet	 res_packet;
 } SIM800_t;
 
-extern __IO char RxBuffer1[];
-extern __IO uint16_t RxCounter1;
-extern SIM800_t *sim800;
-extern MQTTString topicString[];
-
+extern SIM800_t sim800;
+extern MQTTString pub_topicList[];
+extern MQTTString sub_topicList[];
+extern volatile uint32_t timeout_rx_topic;
+extern char sub_topic_index;
+extern unsigned char mqtt_buffer[][256];
 extern char sim_buffer[];
 extern uint16_t sim_buffer_index;
-
+extern bool mqtt_receive ;
+extern bool sub_topic_rx_data_flag;
 void sim_gpio_init();
 
 uint8_t sim_power_status(SIM800_t *sim800);
@@ -135,8 +158,10 @@ signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms);
 void sim_reconnect_handler(SIM800_t *sim800);
 uint8_t sim_nosignal_handler(SIM800_t *sim800);
 void MQTT_Pub(char *topic, char *payload);
-void MQTT_Sub(MQTTString *topicString, int *requestedQoSs, int topic_count) ;
+bool MQTT_Sub(MQTTString *topicString, int *requestedQoSs, int topic_count);
 uint8_t MQTT_Connect(SIM800_t *sim800);
 uint8_t MQTT_PingReq(SIM800_t *sim800);
+void MQTT_Receive(unsigned char *buf);
+void clearMqttBuffer();
 void Sim800_RxCallBack();
 #endif /* SIMCOM_SIM800_H_ */

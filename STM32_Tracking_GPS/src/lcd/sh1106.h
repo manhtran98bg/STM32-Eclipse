@@ -7,11 +7,11 @@
 #ifndef _SH1106_H_
 #define _SH1106_H_
 
-#include "main.h"
 #include "sh1106_conf.h"
 #include "sh1106_font.h"
 #include "bitmap.h"
 #include "../i2c/i2c.h"
+#include "../main.h"
 // SH1106 OLED height in pixels
 #ifndef SH1106_HEIGHT
 #define SH1106_HEIGHT          64

@@ -7,7 +7,7 @@
 
 #ifndef I2C_I2C_H_
 #define I2C_I2C_H_
-#include "main.h"
+#include "../main.h"
 
 #define I2C1_RCC		RCC_APB1Periph_I2C1
 #define I2C_GPIO_RCC	RCC_APB2Periph_GPIOB

@@ -6,7 +6,7 @@
  */
 #include "delay.h"
 extern volatile uint32_t msTicks;
-extern uint32_t uwTick;
+extern volatile uint32_t uwTick;
 void delay_ms(uint32_t ms)
 {
 	msTicks=ms;

@@ -7,7 +7,7 @@
 
 #ifndef SERVICE_DELAY_H_
 #define SERVICE_DELAY_H_
-#include <main.h>
+#include "../main.h"
 void delay_ms(uint32_t ms);
 void dUS_tim4(uint16_t uS);
 uint32_t millis(void);

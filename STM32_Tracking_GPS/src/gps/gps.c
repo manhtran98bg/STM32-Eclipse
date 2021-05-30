@@ -9,7 +9,8 @@
 uint8_t flagStart = 0,flagStop = 0;
 char gps_buffer[GPS_BUFFER_SIZE];
 uint16_t gps_buffer_index = 0;
-
+extern FATFS	FatFs;
+extern FIL	Fil;
 void gps_power_on()
 {
 	power_on_gps();
@@ -79,7 +80,7 @@ static void gps_uart_module_init(uint32_t baudrate)
 	/*Enable USART	 */
 	USART_Cmd(GPS_UART, ENABLE);
 }
-void gps_check_current_baud()
+void gps_check_current_baud(gps_t *gps)
 {
 	uint32_t baud[2]={115200,9600};
 	uint32_t time_out=0;
@@ -88,15 +89,15 @@ void gps_check_current_baud()
 	//Check current baudrate of gps l70
 	for (i=0;i<2;i++)
 	{
-		gps_l70->gps_response = false;	//Defaut No Reponse
+		gps->gps_response = false;	//Defaut No Reponse
 		time_out = 0;
 		gps_uart_module_init(baud[i]);
-		while ((!gps_l70->gps_response)&&(time_out<10))
+		while ((!gps->gps_response)&&(time_out<10))
 		{
 			time_out++;
 			delay_ms(200);
 		}
-		if (gps_l70->gps_response) {
+		if (gps->gps_response) {
 #if _DEBUG
 			trace_write((char*)"log:", strlen("log:"));
 			sprintf(buff_log,"Check curren baudrate gps L70: BAUD_RATE = %ld",baud[i]);
@@ -104,72 +105,72 @@ void gps_check_current_baud()
 #endif
 #if _DEBUG_UART5
 			sprintf(buff_log,"Check curren baudrate gps L70: BAUD_RATE = %ld\n",baud[i]);
-			UART5_Send_String(buff_log);
+			debug_send_string(buff_log);
 #endif
-			gps_l70->gps_baudrate = baud[i];
+			gps->gps_baudrate = baud[i];
 			break;
 		}
 	}
 }
-void gps_init()
+void gps_init(gps_t *gps)
 {
 	char log[128]={0};
 	gps_rst_pin_init();
 	gps_power_on();
-	if (sim800->power_state == OFF) {
-		gps_l70->gps_err = GPS_NO_PWR;
-		gps_l70->gps_pwr_state = false;
+	if (sim800.power_state == OFF) {
+		gps->gps_err = GPS_NO_PWR;
+		gps->gps_pwr_state = false;
 #if	_DEBUG
 		trace_write((char*)"log:", strlen("log:"));
 		trace_puts("GPS Power State: OFF");
 #endif
 #if _DEBUG_UART5
-		UART5_Send_String("GPS Power State: OFF\n");
+		debug_send_string("GPS Power State: OFF\n");
 #endif
 	}
-	if (sim800->power_state==ON){
-		gps_l70->gps_err = GPS_NO_RES;
-		gps_l70->gps_baudrate = 9600;	//Default Baudrate;
-		gps_l70->gps_state = GPS_INITING;
-		gps_l70->gps_pwr_state = true;
+	if (sim800.power_state==ON){
+		gps->gps_err = GPS_NO_RES;
+		gps->gps_baudrate = 9600;	//Default Baudrate;
+		gps->gps_state = GPS_INITING;
+		gps->gps_pwr_state = true;
 #if	_DEBUG
 		trace_write((char*)"log:", strlen("log:"));
 		trace_puts("GPS Power State: ON");
 #endif
 #if _DEBUG_UART5
-		UART5_Send_String("GPS Power State: ON\n");
+		debug_send_string("GPS Power State: ON\n");
 #endif
 		gps_uart_clk_init();
 		gps_uart_gpio_init();
 		gps_uart_nvic_init();
-		gps_check_current_baud();
-		if (gps_l70->gps_baudrate == 9600) {
+		gps_check_current_baud(gps);
+		if (gps->gps_baudrate == 9600) {
 #if _DEBUG_UART5
-			UART5_Send_String("Change BAUD_RATE to 115200.\n");
+			debug_send_string("Change BAUD_RATE to 115200.\n");
 #endif
 			gps_set_baudrate(115200);
 			delay_ms(500);
 			gps_uart_clear_buffer();
-			gps_check_current_baud();
+			gps_check_current_baud(gps);
 		}
 		gps_uart_send_string((char*)"$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n");
 		delay_ms(500);
-		gps_l70->gps_state = GPS_INITED;
+		gps->gps_state = GPS_INITED;
 		gps_uart_clear_buffer();
 		delay_ms(1000);
 		while(!flagStop);
-		RTC_WriteTime(set_time(gps_l70->RMC.Date.year+2000,
-				gps_l70->RMC.Date.month,
-				gps_l70->RMC.Date.day,
-				gps_l70->RMC.Time.hh+7,
-				gps_l70->RMC.Time.mm,
-				gps_l70->RMC.Time.ss));
-		sprintf(log,"GPS Time:%d-%d-%d\nGPS Date: %d/%d/%d",gps_l70->RMC.Time.hh+7,
-													gps_l70->RMC.Time.mm,
-													gps_l70->RMC.Time.ss,
-													gps_l70->RMC.Date.day,
-													gps_l70->RMC.Date.month,
-													gps_l70->RMC.Date.year+2000);
+		RTC_WriteTime(set_time(gps->RMC.Date.year+2000,
+				gps->RMC.Date.month,
+				gps->RMC.Date.day,
+				gps->RMC.Time.hh,
+				gps->RMC.Time.mm,
+				gps->RMC.Time.ss));
+		sprintf(log,"GPS Time:%d-%d-%d\nGPS Date: %d/%d/%d",gps->RMC.Time.hh,
+													gps->RMC.Time.mm,
+													gps->RMC.Time.ss,
+													gps->RMC.Date.day,
+													gps->RMC.Date.month,
+													gps->RMC.Date.year+2000);
 #if	_DEBUG
 		trace_write((char*)"log:", strlen("log:"));
 		trace_puts(log);
@@ -177,9 +178,9 @@ void gps_init()
 		trace_puts("RTC Sync: OK");
 #endif
 #if _DEBUG_UART5
-		UART5_Send_String(log);
-		UART5_Send_String((char*)"\n");
-		UART5_Send_String("RTC Sync: OK\n");
+		debug_send_string(log);
+		debug_send_string((char*)"\n");
+		debug_send_string("RTC Sync: OK\n");
 #endif
 	}
 }
@@ -247,9 +248,9 @@ uint8_t  gps_read_data(gps_t *gps)
 #if _DEBUG
 		trace_puts((char*)gps_buffer);
 #endif
-#if _DEBUG_GPS_UART5
-		UART5_Send_String((char*)gps_buffer);
-		USART_SendData(UART5, '\n');
+#if _USE_DEBUG_UART
+		debug_send_string((char*)gps_buffer);
+		debug_send_chr('\n');
 #endif
 		gps_uart_clear_buffer();
 		flagStop=0;
@@ -257,38 +258,42 @@ uint8_t  gps_read_data(gps_t *gps)
 	}
 	return 0;
 }
-void gps_RxCallback(){
+void gps_RxCallback(gps_t *gps){
 	unsigned char c;
 	UINT	bw;
 	FRESULT	fr;
-	unsigned char sd_buffer[40]={0};
+	int i=0;
 	c = USART_ReceiveData(GPS_UART);
 	if (c=='$') {	//Start NMEA Sentence
 		flagStart = 1;	//Flag indicate Start of NMEA Sentence
 		gps_buffer_index = 0;
 		flagStop = 0;	//Flag indicate End of NMEA Sentence
-		gps_l70->gps_response = true;
+		gps->gps_response = true;
 	}
 	if (c=='\n') {
 		flagStart = 0;
 		flagStop = 1;
-		if (gps_l70->gps_state == GPS_INITED){
-			RMC_Parse(&gps_l70->RMC, (char*)gps_buffer, gps_buffer_index);
-			RMC_json_init(&gps_l70->RMC, json_geowithtime);
-			sprintf(sd_buffer,"%d-%d-%d\n",gps_l70->RMC.Time.hh,
-										 gps_l70->RMC.Time.mm,
-										 gps_l70->RMC.Time.ss);
-			fr = f_open(&Fil, "DATALOG.txt", FA_WRITE|FA_OPEN_APPEND);
-			if (fr == FR_OK) {
-					f_write(&Fil, sd_buffer, strlen(sd_buffer), &bw);	/* Write data to the file */
-					fr = f_close(&Fil);
-			}
+		if (gps->gps_state == GPS_INITED){
+			RMC_Parse(&gps->RMC, (char*)gps_buffer, gps_buffer_index);
+			RMC_json_init(&gps->RMC, json_geowithtime);
+//			sprintf(sd_buffer,"%d-%d-%d\n",gps->RMC.Time.hh,
+//										gps->RMC.Time.mm,
+//										gps->RMC.Time.ss);
+//			fr = f_open(&Fil, "DATALOG.txt", FA_WRITE|FA_OPEN_APPEND);
+//			if (fr == FR_OK) {
+//					f_write(&Fil, sd_buffer, strlen(sd_buffer), &bw);	/* Write data to the file */
+//					fr = f_close(&Fil);
+//			}
+
 		}
-		gps_l70->gps_err = GPS_NO_ERR;
+		gps->gps_err = GPS_NO_ERR;
 	}
 	if (flagStart){
 		if (gps_buffer_index<GPS_BUFFER_SIZE) gps_buffer[gps_buffer_index++]=c;	//Save Data to gps_buffer
 		else gps_buffer_index = 0;
+	}
+	if (flagStop){
+		gps_uart_clear_buffer();
 	}
 }
 static bool RMC_GetDate(RMC_Data *RMC, char *Date_str)
@@ -427,6 +432,19 @@ static double str2float(char *str)
     for (i=0;i<strlen(dec_chr);i++) lt=lt*10;
     return (double)(int_part+(double)dec_part/lt);
 }
+static void fix_gps_time(RMC_Data *RMC)
+{
+	int day_of_mon[12]={31,28,31,30,31,30,31,31,30,31,30,31};
+	if (RMC->Time.hh+7>23) {
+		RMC->Time.hh = RMC->Time.hh+7-24;
+		RMC->Date.day = RMC->Date.day+1;
+	}
+	else RMC->Time.hh = RMC->Time.hh+7;
+	if (RMC->Date.day>day_of_mon[RMC->Date.month-1]){
+		RMC->Date.day = 1;
+		RMC->Date.month = RMC->Date.month+1;
+	}
+}
 bool RMC_Parse(RMC_Data *RMC, char *RMC_Sentence, int RMC_len)
 {
     int i=0,j=0,k=0;
@@ -449,9 +467,13 @@ bool RMC_Parse(RMC_Data *RMC, char *RMC_Sentence, int RMC_len)
         if (k==4) strcpy(RMC->Lat_dir,temp);
         if (k==5) RMC_GetLongitude(RMC,temp);
         if (k==6) strcpy(RMC->Lon_dir,temp);
-        if (k==7) RMC->Speed = str2float(temp);
+        if (k==7&&strlen(temp)>0) {
+        	RMC->Speed = str2float(temp);
+        }
         if (k==9) RMC_GetDate(RMC, temp);
         k++;
     }
+    fix_gps_time(RMC);
     return true;
 }
+
