@@ -92,10 +92,12 @@ void USART2_IRQHandler(void)
 void RTC_IRQHandler(void)
 {
 	int i=0;
+	char buffer[15]={0};
 	if (RTC_GetITStatus(RTC_IT_SEC) != RESET)
 	{
 		/* Clear the RTC Second interrupt */
 		RTC_ClearITPendingBit(RTC_IT_SEC);
+		RTC_WaitForLastTask();
 		if ((rfid.present == true)&&(rfid.t_out>0)) rfid.t_out--;	//Cho t_out de doc RFID
 		time_struct = convert_time_stamp(RTC_GetCounter());
 		Time.second = time_struct.tm_sec;
@@ -111,23 +113,32 @@ void RTC_IRQHandler(void)
 			}
 		}
 		if (board_state ==true){
-			if (gps_data_count==0){
-				gps_data_count++;
-				memset(sd_buffer,0,128);
+			//Ghi van toc vao the SD
+			if (gps_speed_count==0){
+				gps_speed_count++;
+				memset(sd_buffer_speed,0,128);
 				create_time_str(&Time, time_str);
-				sprintf(&sd_buffer[0],"%s, %d,",time_str,(int)gps_l70.RMC.Speed);
+				sprintf(&sd_buffer_speed[0],"%s, %d,",time_str,(int)gps_l70.RMC.Speed);
 			}
-			else if (gps_data_count==29){
-				gps_data_count = 0;
-				i = strlen (sd_buffer);
-				sprintf(&sd_buffer[i],"%d\n",(int)gps_l70.RMC.Speed);
-				trace_puts(sd_buffer);
-				write2file(directory, strlen(directory), "SPEED.LOG",sd_buffer, strlen (sd_buffer));
+			else if (gps_speed_count==29){
+				gps_speed_count = 0;
+				i = strlen (sd_buffer_speed);
+				sprintf(&sd_buffer_speed[i],"%d\n",(int)gps_l70.RMC.Speed);
+				write2file(directory, strlen(directory), "SPEED.LOG",sd_buffer_speed, strlen (sd_buffer_speed));
 			}
 			else {
-				i = strlen (sd_buffer);
-				sprintf(&sd_buffer[i],"%d,",(int)gps_l70.RMC.Speed);
-				gps_data_count++;
+				i = strlen (sd_buffer_speed);
+				sprintf(&sd_buffer_speed[i],"%d,",(int)gps_l70.RMC.Speed);
+				gps_speed_count++;
+			}
+			//Ghi toa do vao the SD
+			if (Time.second % 5 == 0){
+				memset(sd_buffer_location,0,1024);
+				create_time_str(&Time, time_str);
+				sprintf(&sd_buffer_location[0],"%s, %d.%d, %d.%d\r\n",time_str,
+					gps_l70.RMC.Lat.lat_dec_degree.int_part,gps_l70.RMC.Lat.lat_dec_degree.dec_part,
+					gps_l70.RMC.Lon.lon_dec_degree.int_part,gps_l70.RMC.Lon.lon_dec_degree.dec_part);
+				write2file(directory,strlen(directory),"LOCATION.LOG",sd_buffer_location,strlen(sd_buffer_location));
 			}
 		}
 		if (Time.minute<10) sprintf(time_buffer,"%d:0%d",Time.hour,Time.minute);
@@ -137,7 +148,6 @@ void RTC_IRQHandler(void)
 			Time.old_minute = Time.minute;
 		}
 	    /* Wait until last write operation on RTC registers has finished */
-	    RTC_WaitForLastTask();
 	}
 }
 void EXTI15_10_IRQHandler()

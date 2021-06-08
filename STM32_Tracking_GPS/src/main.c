@@ -32,8 +32,8 @@
 u8 status;
 
 // Khai bao cac bien cho SIM800 && MQTT broker
-//const char IP_Address[]="broker.emqx.io";
-const char IP_Address[]="broker.hivemq.com";
+const char IP_Address[]="broker.emqx.io";
+//const char IP_Address[]="broker.hivemq.com";
 uint16_t port=1883;
 
 SIM800_t sim800;	//Struct SIM800
@@ -92,6 +92,7 @@ uint8_t first_sub_topic (MQTTString *topicList);
 void read_data_sensor_handler();
 void rx_data_subtopic_handler();
 void rfid_handler();
+void pub_data_handler();
 int main(int argc, char* argv[])
 {
 
@@ -201,7 +202,7 @@ void rx_data_subtopic_handler()
 				memcpy(payload[i],sim800.mqttReceive.payload,sim800.mqttReceive.payloadLen);
 			for (j=0;j<6;j++)
 				if (strcmp((char*)topic[i],pub_topicList[j+15].cstring)==0){
-					MQTT_Pub(topic[i], payload[i]);
+					MQTT_Pub((char*)topic[i],(char*) payload[i]);
 					if (strstr((char*)payload[i],"undefined")) break;
 					else freq_array[j]=atoi((char*)payload[i]);
 					break;
@@ -238,6 +239,7 @@ void pub_data_handler()
 	}
 	if ((millis()-time_pub[3])>=freq_array[3]*1000){
 		time_pub[3] = millis();
+		if (gps_l70.RMC.Data_Valid[0]!='V') MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
 		trace_puts("Pub Device Location");
 	}
 	if ((millis()-time_pub[4])>=freq_array[4]*1000){

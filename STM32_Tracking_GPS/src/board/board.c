@@ -72,6 +72,7 @@ void tim4_init()
 	TIM_TimeBaseInitStruct.TIM_Period = 0xffff-1;
 	TIM_TimeBaseInit(TIM4,&TIM_TimeBaseInitStruct);
 	TIM_ClearFlag(TIM4, TIM_FLAG_Update);
+	TIM_Cmd(TIM4, ENABLE);
 }
 void user_led_init()
 {

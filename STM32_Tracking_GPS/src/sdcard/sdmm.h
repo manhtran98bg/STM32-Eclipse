@@ -58,7 +58,9 @@ typedef struct {
 }sd_t;
 extern sd_t sdcard;
 extern char directory[];
-extern char sd_buffer[];	//Mang luu van toc theo thoi gian de ghi vao the SD
+extern char sd_buffer[];		//Mang luu du lieu ghi vao the SD
+extern char sd_buffer_speed[];	//Mang luu van toc theo thoi gian de ghi vao the SD
+extern char sd_buffer_location[];	//Mang luu toa do theo thoi gian de ghi vao the SD
 extern FATFS	FatFs;
 extern FIL	Fil;
 FRESULT write2file(char *directory,int dir_len, char *filename, char *content, int content_len);

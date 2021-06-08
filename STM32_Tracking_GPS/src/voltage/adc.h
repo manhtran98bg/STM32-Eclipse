@@ -25,4 +25,5 @@
 extern __IO uint16_t ADCConvertedValue;
 
 void adc_init();
+void get_vbat(float *vbat);
 #endif /* VOLTAGE_ADC_H_ */

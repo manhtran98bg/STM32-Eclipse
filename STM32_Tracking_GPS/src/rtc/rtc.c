@@ -8,7 +8,8 @@
 #include "rtc.h"
 const uint8_t daysInMonth [] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 char time_str[10]={0};				//Chuoi luu thoi gian dinh dang hh:mm:ss;
-int gps_data_count = 0;
+int gps_speed_count = 0;
+int gps_location_count = 0;
 void RTC_Init()
 {
 	RTC_NVIC_Config();
@@ -63,7 +64,7 @@ void RTC_NVIC_Config()
 	NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
 	/* Enable the RTC Interrupt */
 	NVIC_InitStructure.NVIC_IRQChannel = RTC_IRQn;
-	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 4;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
 	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
 	NVIC_Init(&NVIC_InitStructure);

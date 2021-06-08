@@ -418,6 +418,7 @@ static double str2float(char *str)
 	unsigned int i=0,j=0,lt=1;
 	char int_chr[10]={0};
 	char dec_chr[10]={0};
+	double knot=0;
 	while (str[i]!='.') {
 	    int_chr[i]=str[i];
 	    i++;
@@ -430,7 +431,8 @@ static double str2float(char *str)
 	int_part = atoi(int_chr);
     dec_part = atoi(dec_chr);
     for (i=0;i<strlen(dec_chr);i++) lt=lt*10;
-    return (double)(int_part+(double)dec_part/lt);
+    knot = (double)(int_part+(double)dec_part/lt);
+    return (double)knot*1.852;
 }
 static void fix_gps_time(RMC_Data *RMC)
 {
@@ -461,6 +463,7 @@ bool RMC_Parse(RMC_Data *RMC, char *RMC_Sentence, int RMC_len)
         j=0;
         i++;
         if (k==0) strcpy(RMC->ID,temp);
+        if (strcmp(RMC->ID,"$GPRMC")!=0) return false;
         if (k==1) RMC_GetTime(RMC, temp);
         if (k==2) strcpy(RMC->Data_Valid,temp);
         if (k==3) RMC_GetLatitude(RMC,temp);

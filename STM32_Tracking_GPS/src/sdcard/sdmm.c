@@ -5,8 +5,9 @@ static DSTATUS Stat = STA_NOINIT;	/* Disk status */
 static BYTE CardType;			/* b0:MMC, b1:SDv1, b2:SDv2, b3:Block addressing */
 sd_t sdcard;
 char directory[128]={0};
-char sd_buffer[128]={0};	//Mang luu van toc theo thoi gian de ghi vao the SD
-
+char sd_buffer_speed[128]={0};	//Mang luu van toc theo thoi gian de ghi vao the SD
+char sd_buffer_location[1024]={0};
+char sd_buffer[128]={0};
 extern FATFS	FatFs;
 extern FIL	Fil;
 static void dly_us (UINT n)	/* Delay n microseconds  */
