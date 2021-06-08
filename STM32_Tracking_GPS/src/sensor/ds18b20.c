@@ -392,9 +392,8 @@ uint8_t ds18b20_init(TM_OneWire_t* OneWireStruct, ds18b20_t *ds18b20)
     OneWireStruct->Devices = count;
     /* If any devices on 1wire */
     if (count > 0) {
-        sprintf(buf, "Sensor found on 1-wire: %d sensor\n", count);
+        sprintf(buf, "log: Sensor found on 1-wire: %d sensor\n", count);
 #if _DEBUG
-        trace_write((char*)"log:", strlen("log:"));
         trace_write((char*)buf, strlen(buf));
 #endif
 #if _USE_DEBUG_UART

@@ -11,7 +11,7 @@
 #include "../main.h"
 #include "ff.h"		/* Obtains integer types for FatFs */
 #include "diskio.h"	/* Common include file for FatFs and disk I/O layer */
-
+#include "../src/usart/usart.h"
 
 /*-------------------------------------------------------------------------*/
 /* Platform dependent macros and functions needed to be modified           */

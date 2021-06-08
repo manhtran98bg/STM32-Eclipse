@@ -480,17 +480,27 @@ FRESULT	create_directory(char *directory, struct tm *time_struct){
 #if _DEBUG
     	trace_puts("Directory Exist. Don't Create Directory");
 #endif
+#if _USE_DEBUG_UART
+		debug_send_string("log: Directory Exist. Don't Create Directory\n");
+#endif
     	return FR_EXIST;
     }
     else {
 #if _DEBUG
-    	trace_puts("Directory No Exist. Create Directory");
+    	trace_puts("log: Directory No Exist. Create Directory");
+#endif
+#if _USE_DEBUG_UART
+		debug_send_string("log: Directory No Exist. Create Directory");
 #endif
     	fr = f_mkdir(directory);
     	if(fr == FR_OK){
 #if _DEBUG
     		trace_write(directory, sizeof(directory));
     		trace_puts(" => create OK");
+#endif
+#if _USE_DEBUG_UART
+    		debug_send_string(directory);
+    		debug_send_string("=> create OK\n");
 #endif
     		set_timestamp(directory, time_struct->tm_year+1900, time_struct->tm_mon, time_struct->tm_mday,
     				time_struct->tm_hour, time_struct->tm_min, time_struct->tm_sec);
@@ -499,6 +509,10 @@ FRESULT	create_directory(char *directory, struct tm *time_struct){
 #if _DEBUG
     		trace_write(directory, sizeof(directory));
     		trace_puts(" => create ERROR");
+#endif
+#if _USE_DEBUG_UART
+    		debug_send_string(directory);
+    		debug_send_string("=> create ERROR\n");
 #endif
     	}
     	return fr;

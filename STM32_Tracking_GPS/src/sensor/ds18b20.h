@@ -8,7 +8,7 @@
 #ifndef DS18B20_H
 #define DS18B20_H
 #include "onewire.h"
-
+#include "../src/usart/usart.h"
 /* Every onewire chip has different ROM code, but all the same chips has same family code */
 /* in case of DS18B20 this is 0x28 and this is first byte of ROM address */
 #define DS18B20_FAMILY_CODE				0x28

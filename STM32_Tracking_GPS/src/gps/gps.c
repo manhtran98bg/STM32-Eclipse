@@ -124,8 +124,8 @@ void gps_init(gps_t *gps)
 		trace_write((char*)"log:", strlen("log:"));
 		trace_puts("GPS Power State: OFF");
 #endif
-#if _DEBUG_UART5
-		debug_send_string("GPS Power State: OFF\n");
+#if _USE_DEBUG_UART
+		debug_send_string("log: GPS Power State: OFF\n");
 #endif
 	}
 	if (sim800.power_state==ON){
@@ -137,16 +137,16 @@ void gps_init(gps_t *gps)
 		trace_write((char*)"log:", strlen("log:"));
 		trace_puts("GPS Power State: ON");
 #endif
-#if _DEBUG_UART5
-		debug_send_string("GPS Power State: ON\n");
+#if _USE_DEBUG_UART
+		debug_send_string("log: GPS Power State: ON\n");
 #endif
 		gps_uart_clk_init();
 		gps_uart_gpio_init();
 		gps_uart_nvic_init();
 		gps_check_current_baud(gps);
 		if (gps->gps_baudrate == 9600) {
-#if _DEBUG_UART5
-			debug_send_string("Change BAUD_RATE to 115200.\n");
+#if _USE_DEBUG_UART
+			debug_send_string("log: Change BAUD_RATE to 115200.\n");
 #endif
 			gps_set_baudrate(115200);
 			delay_ms(500);
@@ -165,22 +165,19 @@ void gps_init(gps_t *gps)
 				gps->RMC.Time.hh,
 				gps->RMC.Time.mm,
 				gps->RMC.Time.ss));
-		sprintf(log,"GPS Time:%d-%d-%d\nGPS Date: %d/%d/%d",gps->RMC.Time.hh,
+		sprintf(log,"log: GPS Time:%d:%d:%d     GPS Date: %d/%d/%d\n",gps->RMC.Time.hh,
 													gps->RMC.Time.mm,
 													gps->RMC.Time.ss,
 													gps->RMC.Date.day,
 													gps->RMC.Date.month,
 													gps->RMC.Date.year+2000);
 #if	_DEBUG
-		trace_write((char*)"log:", strlen("log:"));
-		trace_puts(log);
-		trace_write((char*)"log:", strlen("log:"));
-		trace_puts("RTC Sync: OK");
+		trace_write(log,strlen(log));
+		trace_puts("log: RTC Sync: OK");
 #endif
-#if _DEBUG_UART5
+#if _USE_DEBUG_UART
 		debug_send_string(log);
-		debug_send_string((char*)"\n");
-		debug_send_string("RTC Sync: OK\n");
+		debug_send_string("log: RTC Sync: OK\n");
 #endif
 	}
 }

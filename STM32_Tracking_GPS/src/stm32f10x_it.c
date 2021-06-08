@@ -10,7 +10,7 @@
 #include "rs232/rs232.h"
 volatile uint32_t msTicks=0;
 volatile uint32_t myTicks_tim4=0;
-uint32_t uwTick=0;
+volatile uint32_t uwTick=0;
 
 extern bool _1sflag;
 extern bool board_state;
@@ -93,19 +93,27 @@ void RTC_IRQHandler(void)
 {
 	int i=0;
 	char buffer[15]={0};
+	__IO uint32_t RTC_cnt=0;
 	if (RTC_GetITStatus(RTC_IT_SEC) != RESET)
 	{
-		/* Clear the RTC Second interrupt */
-		RTC_ClearITPendingBit(RTC_IT_SEC);
-		RTC_WaitForLastTask();
+		RTC_cnt = RTC_GetCounter();
 		if ((rfid.present == true)&&(rfid.t_out>0)) rfid.t_out--;	//Cho t_out de doc RFID
-		time_struct = convert_time_stamp(RTC_GetCounter());
+		time_struct = convert_time_stamp(RTC_cnt);
 		Time.second = time_struct.tm_sec;
 		Time.minute = time_struct.tm_min;
 		Time.hour = time_struct.tm_hour;
 		Time.year = time_struct.tm_year;
 		Time.mon = time_struct.tm_mon;
 		Time.day = time_struct.tm_mday;
+//		if (board_state ==true){
+//			sprintf(buffer,"%d\n",RTC_cnt);
+//			create_time_str(&Time, time_str);
+//			debug_send_string(buffer);
+//		}
+//		if (Time.second % 5 == 0){
+//			create_time_str(&Time, time_str);
+//			trace_puts(time_str);
+//		}
 		if (sdcard.mount==true){
 			if (Time.old_day!=Time.day){
 				Time.old_day=Time.day;
@@ -124,6 +132,8 @@ void RTC_IRQHandler(void)
 				gps_speed_count = 0;
 				i = strlen (sd_buffer_speed);
 				sprintf(&sd_buffer_speed[i],"%d\n",(int)gps_l70.RMC.Speed);
+				debug_send_string("Write Speed to File\n");
+				debug_send_string(sd_buffer_speed);
 				write2file(directory, strlen(directory), "SPEED.LOG",sd_buffer_speed, strlen (sd_buffer_speed));
 			}
 			else {
@@ -138,6 +148,8 @@ void RTC_IRQHandler(void)
 				sprintf(&sd_buffer_location[0],"%s, %d.%d, %d.%d\r\n",time_str,
 					gps_l70.RMC.Lat.lat_dec_degree.int_part,gps_l70.RMC.Lat.lat_dec_degree.dec_part,
 					gps_l70.RMC.Lon.lon_dec_degree.int_part,gps_l70.RMC.Lon.lon_dec_degree.dec_part);
+				debug_send_string("Write Location to File\n");
+				debug_send_string(sd_buffer_location);
 				write2file(directory,strlen(directory),"LOCATION.LOG",sd_buffer_location,strlen(sd_buffer_location));
 			}
 		}
@@ -147,7 +159,10 @@ void RTC_IRQHandler(void)
 			_1sflag = true;
 			Time.old_minute = Time.minute;
 		}
+		/* Clear the RTC Second interrupt */
+		RTC_ClearITPendingBit(RTC_IT_SEC);
 	    /* Wait until last write operation on RTC registers has finished */
+		RTC_WaitForLastTask();
 	}
 }
 void EXTI15_10_IRQHandler()

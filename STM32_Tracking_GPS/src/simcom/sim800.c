@@ -175,7 +175,7 @@ uint8_t sim_power_on(SIM800_t *sim800)
 		trace_puts("Waiting SIM Power ON.");
 #endif
 #if _USE_DEBUG_UART
-		debug_send_string((char*)"Waiting SIM Power ON.\n");
+		debug_send_string("log: Waiting SIM Power ON.\n");
 #endif
 		while((time_out++<100)) {
 			if(sim_power_status(sim800)) break;
@@ -200,7 +200,7 @@ uint8_t sim_power_on(SIM800_t *sim800)
 			trace_puts("SIM Power State: ON");
 #endif
 #if _USE_DEBUG_UART
-			debug_send_string((char*)"SIM Power State: ON\n");
+			debug_send_string("log: SIM Power State: ON\n");
 #endif
 			sim800->power_state = ON;
 			return 1;
@@ -210,8 +210,9 @@ uint8_t sim_power_on(SIM800_t *sim800)
 #if _DEBUG
 		trace_puts("SIM Power State: ALREADY ON");
 #endif
+
 #if _USE_DEBUG_UART
-		debug_send_string((char*)"SIM Power State: ALREADY ON\n");
+		debug_send_string("log: SIM Power State: ALREADY ON\n");
 #endif
 		sim800->power_state = ON;
 		return 1;
@@ -227,11 +228,17 @@ void sim_power_off(SIM800_t *sim800)
 		trace_write((char*)"log:", strlen("log:"));
 		trace_puts("SIM Power State: OFF");
 #endif
+#if _USE_DEBUG_UART
+		debug_send_string("log: SIM Power State: OFF\n");
+#endif
 	}
 	else{
 #if _DEBUG
 		trace_write((char*)"log:", strlen("log:"));
 		trace_puts("SIM Power State: ALREADY OFF");
+#endif
+#if _USE_DEBUG_UART
+		debug_send_string("log: SIM Power State: ALREADY OFF\n");
 #endif
 	}
 }
@@ -1003,7 +1010,7 @@ void clearMqttBuffer() {
 void Sim800_RxCallBack(void) {
 	unsigned char c;
 	c = USART_ReceiveData(SIM_UART);
-	debug_send_chr(c);
+//	debug_send_chr(c);
 	if (sim_buffer_index<SIM_BUFFER_SIZE) sim_buffer[sim_buffer_index++]=c;
 	else sim_buffer_index = 0;
 	if (sim800.send_state == SENT || sim800.send_state == NO_SEND){

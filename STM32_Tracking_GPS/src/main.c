@@ -120,16 +120,24 @@ int main(int argc, char* argv[])
 		if (millis()-time_ping_sver>10000)
 		{
 			time_ping_sver = millis();
-			if(MQTT_PingReq(&sim800)) trace_puts("OK");
-			else trace_puts("FAIL");
+			if(MQTT_PingReq(&sim800)) {
+				#if _USE_DEBUG_UART
+					debug_send_string("PING OK\n");
+				#endif
+			}
+			else {
+				#if _USE_DEBUG_UART
+					debug_send_string("PING FAIL\n");
+				#endif
+			}
 		}
 		if (millis()-time_read_data>1000){	//2S doc data 1 lan
 			time_read_data=millis();
 			read_data_sensor_handler();
 		}
-		if (sim800.mqttServer.connect==true){
-			pub_data_handler();
-		}
+//		if (sim800.mqttServer.connect==true){
+//			pub_data_handler();
+//		}
         if (sub_topic_rx_data_flag == true){
         	rx_data_subtopic_handler();
         }
@@ -227,7 +235,7 @@ void pub_data_handler()
 		time_pub[0] = millis();
 		trace_puts("Pub Device Temp");
 		sprintf(payload_buf,"%d",(int)ds18b20[0].temp);
-		MQTT_Pub(pub_topicList[12].cstring,payload_buf);	//Temp Device
+//		MQTT_Pub(pub_topicList[12].cstring,payload_buf);	//Temp Device
 	}
 	if ((millis()-time_pub[1])>=freq_array[1]*1000){
 		time_pub[1] = millis();
@@ -239,8 +247,8 @@ void pub_data_handler()
 	}
 	if ((millis()-time_pub[3])>=freq_array[3]*1000){
 		time_pub[3] = millis();
-		if (gps_l70.RMC.Data_Valid[0]!='V') MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
-		trace_puts("Pub Device Location");
+//		if (gps_l70.RMC.Data_Valid[0]!='V') MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
+//		trace_puts("Pub Device Location");
 	}
 	if ((millis()-time_pub[4])>=freq_array[4]*1000){
 		time_pub[4] = millis();
@@ -554,23 +562,20 @@ static void sdcard_check()
 		sdcard.mount = true;
 		sdcard.serNum = vsn;
 		strcpy(sdcard.label,label);
-		sprintf(log,"Mount SDCard OK. Label=%s. Serial Number=%ld",label,vsn);
+		sprintf(log,"log: Mount SDCard OK. Label=%s. Serial Number=%ld\n",label,vsn);
 #if	_DEBUG
-		trace_write((char*)"log:", strlen("log:"));
-		trace_puts(log);
+		trace_write(log,strlen(log));
 #endif
 #if _USE_DEBUG_UART
 		debug_send_string(log);
-		debug_send_chr('\n');
 #endif
 	}
 	else {
 #if	_DEBUG
-		trace_write((char*)"log:", strlen("log:"));
-		trace_puts("Mount SDCard Fail.");
+		trace_puts("log: Mount SDCard Fail.");
 #endif
 #if _USE_DEBUG_UART
-		debug_send_string("Mount SDCard Fail.\n");
+		debug_send_string("log: Mount SDCard Fail.\n");
 #endif
 	}
 
@@ -582,21 +587,18 @@ static void board_init()
 	user_led_init();
 	btn_init();
 	tim4_init();
+	usart_init();
 	power_reset_sim();
 #if _USE_SIM
 	sim_gpio_init();
 	sim_power_off(&sim800);
 #endif
-	usart_init();
 	rs232_init();
 	adc_init();
 	MFRC522_Init();
 	ds18b20_init(&OneWire1, ds18b20);
 #if _USE_SIM
-//	board.periph[0].name = "SIM800";
-	if(sim_power_on(&sim800)){
-//		board.periph[0].available = true;
-	}
+	sim_power_on(&sim800);
 #endif
 	gps_init(&gps_l70);
 #if _USE_SDCARD
