@@ -92,10 +92,10 @@ void USART2_IRQHandler(void)
 void RTC_IRQHandler(void)
 {
 	int i=0;
-	char buffer[15]={0};
 	__IO uint32_t RTC_cnt=0;
 	if (RTC_GetITStatus(RTC_IT_SEC) != RESET)
 	{
+		user_led_toggle();
 		RTC_cnt = RTC_GetCounter();
 		if ((rfid.present == true)&&(rfid.t_out>0)) rfid.t_out--;	//Cho t_out de doc RFID
 		time_struct = convert_time_stamp(RTC_cnt);

@@ -19,7 +19,7 @@
 #include "port_pin.h"
 #include "stm32f10x_conf.h"
 
-#define _DEBUG	1
+#define _DEBUG	0
 #define _STM32F103RCT6_
 
 #endif /* MAIN_H_ */

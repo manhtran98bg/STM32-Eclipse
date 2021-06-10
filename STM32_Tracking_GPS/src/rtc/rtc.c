@@ -6,6 +6,7 @@
  */
 
 #include "rtc.h"
+#include "../src/usart/usart.h"
 const uint8_t daysInMonth [] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
 char time_str[10]={0};				//Chuoi luu thoi gian dinh dang hh:mm:ss;
 int gps_speed_count = 0;
@@ -20,11 +21,18 @@ void RTC_Init()
 #if _DEBUG
 		trace_puts("RTC not yet configured....");
 #endif
+#if _USE_DEBUG_UART
+		debug_send_string("log: RTC not yet configured....\n");
+#endif
+
 		/* RTC Configuration */
 		RTC_ClockConfig();
 		RTC_SetCounter(set_time(2021, 5, 17, 17, 42, 20));
 #if _DEBUG
 		trace_puts("RTC configured....");
+#endif
+#if _USE_DEBUG_UART
+		debug_send_string("log: RTC configured....\n");
 #endif
 		BKP_WriteBackupRegister(BKP_DR1, 0xA5A5);
 	}
@@ -37,6 +45,10 @@ void RTC_Init()
 #if _DEBUG
 	    	trace_puts("Power On Reset occurred....");
 #endif
+#if _USE_DEBUG_UART
+	    	debug_send_string("log: Power On Reset occurred....\n");
+#endif
+
 	    }
 	    /* Check if the Pin Reset flag is set */
 	    else if (RCC_GetFlagStatus(RCC_FLAG_PINRST) != RESET)
@@ -44,9 +56,15 @@ void RTC_Init()
 #if _DEBUG
 	    	trace_puts("External Reset occurred....");
 #endif
+#if _USE_DEBUG_UART
+	    	debug_send_string("log: External Reset occurred....\n");
+#endif
 	    }
 #if _DEBUG
 	    trace_puts("No need to configure RTC....");
+#endif
+#if _USE_DEBUG_UART
+	    debug_send_string("log: No need to configure RTC....\n");
 #endif
 	    /* Wait for RTC registers synchronization */
 	    RTC_WaitForSynchro();

@@ -271,17 +271,12 @@ void gps_RxCallback(gps_t *gps){
 		flagStart = 0;
 		flagStop = 1;
 		if (gps->gps_state == GPS_INITED){
+#ifdef _USE_DEBUG_UART
+//			debug_send_string(gps_buffer);
+//			debug_send_chr('\n');
+#endif
 			RMC_Parse(&gps->RMC, (char*)gps_buffer, gps_buffer_index);
 			RMC_json_init(&gps->RMC, json_geowithtime);
-//			sprintf(sd_buffer,"%d-%d-%d\n",gps->RMC.Time.hh,
-//										gps->RMC.Time.mm,
-//										gps->RMC.Time.ss);
-//			fr = f_open(&Fil, "DATALOG.txt", FA_WRITE|FA_OPEN_APPEND);
-//			if (fr == FR_OK) {
-//					f_write(&Fil, sd_buffer, strlen(sd_buffer), &bw);	/* Write data to the file */
-//					fr = f_close(&Fil);
-//			}
-
 		}
 		gps->gps_err = GPS_NO_ERR;
 	}
@@ -402,12 +397,31 @@ static bool RMC_GetLongitude(RMC_Data *RMC,char *Lon_str)
  */
 void RMC_json_init(RMC_Data *RMC, char *buffer)
 {
+	char year_buf[5]={0};
+	char mon_buf[5]={0};
+	char day_buf[5]={0};
+	char hour_buf[5]={0};
+	char min_buf[5]={0};
+	char sec_buf[5]={0};
+	//YYMMDD
+	sprintf(year_buf,"20%d", RMC->Date.year);
+	if (RMC->Date.month<10) sprintf(mon_buf,"0%d", RMC->Date.month);
+	else sprintf(mon_buf,"%d", RMC->Date.month);
+	if (RMC->Date.day<10) sprintf(day_buf,"0%d", RMC->Date.day);
+	else sprintf(day_buf,"%d", RMC->Date.day);
+	//HHMMSS
+	if (RMC->Time.hh<10) sprintf(hour_buf,"0%d", RMC->Time.hh);
+	else sprintf(hour_buf,"%d", RMC->Time.hh);
+	if (RMC->Time.mm<10) sprintf(min_buf,"0%d", RMC->Time.mm);
+	else sprintf(min_buf,"%d", RMC->Time.mm);
+	if (RMC->Time.ss<10) sprintf(sec_buf,"0%d", RMC->Time.ss);
+	else sprintf(sec_buf,"%d", RMC->Time.ss);
 	sprintf(buffer,"{\"lng\":\"%d.%ld\","
 				   "\"lat\":\"%d.%ld\","
-				   "\"time\":\"20%d-0%d-%dT0%d:%d:%d+00:00\"}",RMC->Lon.lon_dec_degree.int_part,RMC->Lon.lon_dec_degree.dec_part,
+				   "\"time\":\"%s-%s-%sT%s:%s:%s+00:00\"}",RMC->Lon.lon_dec_degree.int_part,RMC->Lon.lon_dec_degree.dec_part,
 				   RMC->Lat.lat_dec_degree.int_part,RMC->Lat.lat_dec_degree.dec_part,
-				   RMC->Date.year,RMC->Date.month,RMC->Date.day,
-				   RMC->Time.hh,RMC->Time.mm,RMC->Time.ss);
+				   year_buf,mon_buf,day_buf,
+				   hour_buf,min_buf,sec_buf);
 }
 static double str2float(char *str)
 {

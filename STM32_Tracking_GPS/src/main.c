@@ -127,7 +127,7 @@ int main(int argc, char* argv[])
 			}
 			else {
 				#if _USE_DEBUG_UART
-					debug_send_string("PING FAIL\n");
+					debug_send_string("PING FAIL..\n");
 				#endif
 			}
 		}
@@ -135,9 +135,9 @@ int main(int argc, char* argv[])
 			time_read_data=millis();
 			read_data_sensor_handler();
 		}
-//		if (sim800.mqttServer.connect==true){
-//			pub_data_handler();
-//		}
+		if (sim800.mqttServer.connect==true){
+			pub_data_handler();
+		}
         if (sub_topic_rx_data_flag == true){
         	rx_data_subtopic_handler();
         }
@@ -233,30 +233,42 @@ void pub_data_handler()
 	char payload_buf[20]={0};
 	if ((millis()-time_pub[0])>=freq_array[0]*1000){
 		time_pub[0] = millis();
-		trace_puts("Pub Device Temp");
+#ifdef _USE_DEBUG_UART
+		debug_send_string("log: Pub Device Temp\n");
+#endif
 		sprintf(payload_buf,"%d",(int)ds18b20[0].temp);
-//		MQTT_Pub(pub_topicList[12].cstring,payload_buf);	//Temp Device
+		MQTT_Pub(pub_topicList[12].cstring,payload_buf);	//Temp Device
 	}
 	if ((millis()-time_pub[1])>=freq_array[1]*1000){
 		time_pub[1] = millis();
-		trace_puts("Pub Enviroment Temp");
+#ifdef _USE_DEBUG_UART
+		debug_send_string("log: Pub Enviroment Temp\n");
+#endif
 	}
 	if ((millis()-time_pub[2])>=freq_array[2]*1000){
+#ifdef _USE_DEBUG_UART
+		debug_send_string("log: Pub Enviroment Humidity\n");
+#endif
 		time_pub[2] = millis();
-		trace_puts("Pub Enviroment Humidity");
 	}
 	if ((millis()-time_pub[3])>=freq_array[3]*1000){
 		time_pub[3] = millis();
-//		if (gps_l70.RMC.Data_Valid[0]!='V') MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
-//		trace_puts("Pub Device Location");
+		if (gps_l70.RMC.Data_Valid[0]!='V') MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
+#ifdef _USE_DEBUG_UART
+		debug_send_string("log: Pub Device Location\n");
+#endif
 	}
 	if ((millis()-time_pub[4])>=freq_array[4]*1000){
 		time_pub[4] = millis();
-		trace_puts("Pub Batery voltage");
+#ifdef _USE_DEBUG_UART
+		debug_send_string("log: Pub Batery voltage\n");
+#endif
 	}
 	if ((millis()-time_pub[5])>=freq_array[5]*1000){
 		time_pub[5] = millis();
-		trace_puts("Pub Vehicle RPM");
+#ifdef _USE_DEBUG_UART
+		debug_send_string("log: Pub Vehicle RPM\n");
+#endif
 	}
 }
 void init_var()
@@ -410,9 +422,12 @@ uint8_t first_sub_topic (MQTTString *topicList)
 	if (MQTT_Sub(&topicList[2], requestedQoSs, 2)) count++;
 	delay_ms(10);
 	if (MQTT_Sub(&topicList[4], requestedQoSs, 2)) count++;
+	sprintf(buf,"Number of Topic Subcribed = %d\n",count*2);
 #if _DEBUG
-	sprintf(buf,"Number of Topic Subcribed = %d",count);
 	trace_puts(buf);
+#endif
+#if _USE_DEBUG_UART
+	debug_send_string(buf);
 #endif
 	return count;
 }
@@ -450,9 +465,15 @@ static void sim_start(){
 #if _DEBUG
 					trace_puts("Publish First Topic to Broker");
 #endif
+#if _USE_DEBUG_UART
+					debug_send_string("log: Publish First Topics to Broker\n");
+#endif
 					first_pub_topic(pub_topicList);
 #if _DEBUG
 					trace_puts("Subcribe First Topic to Broker");
+#endif
+#if _USE_DEBUG_UART
+					debug_send_string("log: Subcribe First Topics to Broker\n");
 #endif
 					first_sub_topic(sub_topicList);
 				}
@@ -583,11 +604,11 @@ static void sdcard_check()
 static void board_init()
 {
 	clk_init();
+	usart_init();
 	RTC_Init();
 	user_led_init();
 	btn_init();
 	tim4_init();
-	usart_init();
 	power_reset_sim();
 #if _USE_SIM
 	sim_gpio_init();
