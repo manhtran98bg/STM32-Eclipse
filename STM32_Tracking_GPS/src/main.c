@@ -117,12 +117,13 @@ int main(int argc, char* argv[])
 	board_state = true;
 	while(1)
 	{
+#if _USE_SIM
 		if (millis()-time_ping_sver>10000)
 		{
 			time_ping_sver = millis();
 			if(MQTT_PingReq(&sim800)) {
 				#if _USE_DEBUG_UART
-					debug_send_string("PING OK\n");
+					debug_send_string("PING OK..\n");
 				#endif
 			}
 			else {
@@ -141,6 +142,7 @@ int main(int argc, char* argv[])
         if (sub_topic_rx_data_flag == true){
         	rx_data_subtopic_handler();
         }
+#endif
 #if _USE_SIM
 		if (sim800.power_state == ON)	//Neu module SIM bat
 		{
@@ -621,6 +623,7 @@ static void board_init()
 #if _USE_SIM
 	sim_power_on(&sim800);
 #endif
+	sim800.power_state = ON;
 	gps_init(&gps_l70);
 #if _USE_SDCARD
 	sdcard_check();

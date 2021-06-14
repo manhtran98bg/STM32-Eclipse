@@ -10,6 +10,8 @@
 char debug_rx_buffer[DEBUG_BUFFER_SIZE];
 uint8_t debug_rx_buffer_index=0;
 
+bool debug_flagStart=0;
+bool debug_flagStop=0;
 static void usart_clk_init(void);
 static void usart_gpio_init(void);
 static void usart_module_init(void);

@@ -64,7 +64,15 @@ void UART5_IRQHandler(void)
 	if(USART_GetITStatus(DEBUG_UART, USART_IT_RXNE) != RESET)
 	{
 			c = USART_ReceiveData(DEBUG_UART);
-			USART_SendData(UART5, c);
+			if (c=='\n') {
+				debug_rx_buffer[debug_rx_buffer_index]=c;
+				gps_uart_send_string(debug_rx_buffer);
+				debug_clear_buffer();
+			}
+			else {
+				if (debug_rx_buffer_index<DEBUG_BUFFER_SIZE) debug_rx_buffer[debug_rx_buffer_index++]=c;	//Save Data to gps_buffer
+				else debug_rx_buffer_index = 0;
+			}
 	}
 
 }

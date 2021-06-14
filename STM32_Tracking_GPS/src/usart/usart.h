@@ -25,7 +25,8 @@
 
 extern char debug_rx_buffer[];
 extern uint8_t debug_rx_buffer_index;
-
+extern bool debug_flagStart;
+extern bool debug_flagStop;
 void usart_init();
 void debug_send_chr(unsigned char chr);
 void debug_send_string(char *str);

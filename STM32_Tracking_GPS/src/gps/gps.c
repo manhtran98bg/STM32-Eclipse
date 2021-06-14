@@ -103,7 +103,7 @@ void gps_check_current_baud(gps_t *gps)
 			sprintf(buff_log,"Check curren baudrate gps L70: BAUD_RATE = %ld",baud[i]);
 			trace_puts(buff_log);
 #endif
-#if _DEBUG_UART5
+#if _USE_DEBUG_UART
 			sprintf(buff_log,"Check curren baudrate gps L70: BAUD_RATE = %ld\n",baud[i]);
 			debug_send_string(buff_log);
 #endif
@@ -153,8 +153,15 @@ void gps_init(gps_t *gps)
 			gps_uart_clear_buffer();
 			gps_check_current_baud(gps);
 		}
-		gps_uart_send_string((char*)"$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n");
+#if _USE_DEBUG_UART
+		debug_send_string("log: GPS COLD RESTART...\n");
+#endif
+		gps_uart_send_string((char*)"$PMTK103*30\r\n");
 		delay_ms(500);
+		gps_uart_send_string((char*)"$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n");
+		delay_ms(100);
+		gps_uart_send_string((char*)"$PMTK886,2*2A\r\n");
+		delay_ms(100);
 		gps->gps_state = GPS_INITED;
 		gps_uart_clear_buffer();
 		delay_ms(1000);
@@ -261,6 +268,7 @@ void gps_RxCallback(gps_t *gps){
 	FRESULT	fr;
 	int i=0;
 	c = USART_ReceiveData(GPS_UART);
+	debug_send_chr(c);
 	if (c=='$') {	//Start NMEA Sentence
 		flagStart = 1;	//Flag indicate Start of NMEA Sentence
 		gps_buffer_index = 0;
@@ -271,10 +279,6 @@ void gps_RxCallback(gps_t *gps){
 		flagStart = 0;
 		flagStop = 1;
 		if (gps->gps_state == GPS_INITED){
-#ifdef _USE_DEBUG_UART
-//			debug_send_string(gps_buffer);
-//			debug_send_chr('\n');
-#endif
 			RMC_Parse(&gps->RMC, (char*)gps_buffer, gps_buffer_index);
 			RMC_json_init(&gps->RMC, json_geowithtime);
 		}
