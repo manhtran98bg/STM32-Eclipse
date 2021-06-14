@@ -65,12 +65,10 @@ static void usart_nvic_init(void)
 }
 void usart_init()
 {
-#if _USE_DEBUG_UART
 	usart_clk_init();
 	usart_gpio_init();
 	usart_module_init();
 	usart_nvic_init();
-#endif
 }
 void debug_send_chr(unsigned char chr)
 {

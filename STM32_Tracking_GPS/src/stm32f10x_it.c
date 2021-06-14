@@ -118,10 +118,10 @@ void RTC_IRQHandler(void)
 //			create_time_str(&Time, time_str);
 //			debug_send_string(buffer);
 //		}
-//		if (Time.second % 5 == 0){
-//			create_time_str(&Time, time_str);
-//			trace_puts(time_str);
-//		}
+		if (Time.second % 5 == 0){
+			create_time_str(&Time, time_str);
+			trace_puts(time_str);
+		}
 		if (sdcard.mount==true){
 			if (Time.old_day!=Time.day){
 				Time.old_day=Time.day;

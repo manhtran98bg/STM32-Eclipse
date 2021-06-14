@@ -11,6 +11,7 @@ char gps_buffer[GPS_BUFFER_SIZE];
 uint16_t gps_buffer_index = 0;
 extern FATFS	FatFs;
 extern FIL	Fil;
+extern bool board_state;
 void gps_power_on()
 {
 	power_on_gps();
@@ -154,13 +155,21 @@ void gps_init(gps_t *gps)
 			gps_check_current_baud(gps);
 		}
 #if _USE_DEBUG_UART
-		debug_send_string("log: GPS COLD RESTART...\n");
+		debug_send_string("log: GPS Config...\n");
 #endif
-		gps_uart_send_string((char*)"$PMTK103*30\r\n");
-		delay_ms(500);
-		gps_uart_send_string((char*)"$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n");
+		gps_uart_send_string((char*)"$PMTK314,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0*29\r\n");	//Set GPRMC Sentence Output
 		delay_ms(100);
-		gps_uart_send_string((char*)"$PMTK886,2*2A\r\n");
+		gps_uart_send_string((char*)"$PMTK886,0*28\r\n");	//Enter Vehicle Mode
+		delay_ms(100);
+		gps_uart_send_string((char*)"$PMTK386,0.9*34\r\n");	//Setting speed threshold
+		delay_ms(100);
+		gps_uart_send_string((char*)"$PMTK869,1,1*35\r\n");	//Enable EASY
+		delay_ms(100);
+		gps_uart_send_string((char*)"$PMTK353,1,1,1,0,0*2A\r\n");	//Search GPS,GLONASS,GALILEO satellites
+		delay_ms(100);
+		gps_uart_send_string((char*)"$PMTK352,0*2A\r\n");	//Enable QZSS Function
+		delay_ms(100);
+		gps_uart_send_string((char*)"$PMTK286,1*23\r\n");	//Enable active interference cancellation function
 		delay_ms(100);
 		gps->gps_state = GPS_INITED;
 		gps_uart_clear_buffer();
