@@ -14,6 +14,7 @@
 #include "diag/Trace.h"
 #include "float.h"
 #include <time.h>
+#include "math.h"
 
 #include "stm32f10x.h"
 #include "port_pin.h"

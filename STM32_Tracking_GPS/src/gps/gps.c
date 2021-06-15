@@ -9,6 +9,8 @@
 uint8_t flagStart = 0,flagStop = 0;
 char gps_buffer[GPS_BUFFER_SIZE];
 uint16_t gps_buffer_index = 0;
+uint8_t nmea_sentence_index = 0;
+unsigned char nmea_sentence_buffer[6][128]={{0}};
 extern FATFS	FatFs;
 extern FIL	Fil;
 extern bool board_state;
@@ -171,6 +173,8 @@ void gps_init(gps_t *gps)
 		delay_ms(100);
 		gps_uart_send_string((char*)"$PMTK286,1*23\r\n");	//Enable active interference cancellation function
 		delay_ms(100);
+//		gps_uart_send_string((char*)"$PMTK314,-1*04\r\n");	//Set NMEA Sentence Output
+//		delay_ms(100);
 		gps->gps_state = GPS_INITED;
 		gps_uart_clear_buffer();
 		delay_ms(1000);
@@ -254,6 +258,7 @@ void gps_set_baudrate(uint32_t baud)
 	sprintf(cmdBuf,"$PMTK251,%ld*1F\r\n",baud);
 	gps_uart_send_string(cmdBuf);
 }
+
 uint8_t  gps_read_data(gps_t *gps)
 {
 	if (flagStop)
@@ -273,32 +278,28 @@ uint8_t  gps_read_data(gps_t *gps)
 }
 void gps_RxCallback(gps_t *gps){
 	unsigned char c;
-	UINT	bw;
-	FRESULT	fr;
-	int i=0;
 	c = USART_ReceiveData(GPS_UART);
-	debug_send_chr(c);
 	if (c=='$') {	//Start NMEA Sentence
 		flagStart = 1;	//Flag indicate Start of NMEA Sentence
+		flagStop = 0;
 		gps_buffer_index = 0;
-		flagStop = 0;	//Flag indicate End of NMEA Sentence
 		gps->gps_response = true;
 	}
 	if (c=='\n') {
 		flagStart = 0;
 		flagStop = 1;
 		if (gps->gps_state == GPS_INITED){
-			RMC_Parse(&gps->RMC, (char*)gps_buffer, gps_buffer_index);
-			RMC_json_init(&gps->RMC, json_geowithtime);
+			if(RMC_Parse(&gps->RMC, (char*)gps_buffer, gps_buffer_index)==true)
+			{
+				RMC_json_init(&gps->RMC, json_geowithtime);
+			}
 		}
+		gps_uart_clear_buffer();
 		gps->gps_err = GPS_NO_ERR;
 	}
 	if (flagStart){
 		if (gps_buffer_index<GPS_BUFFER_SIZE) gps_buffer[gps_buffer_index++]=c;	//Save Data to gps_buffer
 		else gps_buffer_index = 0;
-	}
-	if (flagStop){
-		gps_uart_clear_buffer();
 	}
 }
 static bool RMC_GetDate(RMC_Data *RMC, char *Date_str)
@@ -337,15 +338,14 @@ static bool RMC_GetLatitude(RMC_Data *RMC,char *Lat_str)
 	char lat_dd[3]={0};
 	char lat_mm[3]={0};
 	char lat_mmmm[5]={0};
-	double M_m,D_d;
+	double M_m=0,D_d=0,Decimal_Degree=0;
 	int i=0,j=0;
 	if (strlen(Lat_str)==0)
 	{
 		RMC->Lat.lat_dd = 0;
 		RMC->Lat.lat_mm = 0;
 		RMC->Lat.lat_mmmm = 0;
-		RMC->Lat.lat_dec_degree.int_part=0;
-		RMC->Lat.lat_dec_degree.dec_part=0;
+		memset(RMC->Lat.lat_dec_degree,0,16);
 	}
 	else
 	{
@@ -359,8 +359,8 @@ static bool RMC_GetLatitude(RMC_Data *RMC,char *Lat_str)
 		RMC->Lat.lat_mmmm = atoi(lat_mmmm);
 		M_m = RMC->Lat.lat_mm + (double)RMC->Lat.lat_mmmm/10000.0;
 		D_d = (double)M_m/60.0;
-		RMC->Lat.lat_dec_degree.int_part = RMC->Lat.lat_dd;
-		RMC->Lat.lat_dec_degree.dec_part =(long) (D_d*100000000);
+		Decimal_Degree = (double)(RMC->Lat.lat_dd+D_d);
+		ftoa(Decimal_Degree, RMC->Lat.lat_dec_degree, 8);
 	}
 	return 1;
 }
@@ -370,15 +370,14 @@ static bool RMC_GetLongitude(RMC_Data *RMC,char *Lon_str)
 	char lon_ddd[4]={0};
 	char lon_mm[3]={0};
 	char lon_mmmm[5]={0};
-	double M_m,D_d;
+	double M_m=0,D_d=0,Decimal_Degree=0;
 	int i=0,j=0;
 	if (strlen(Lon_str)==0)
 	{
 		RMC->Lon.lon_ddd = 0;
 		RMC->Lon.lon_mm = 0;
 		RMC->Lon.lon_mmmm = 0;
-		RMC->Lon.lon_dec_degree.int_part=0;
-		RMC->Lon.lon_dec_degree.dec_part=0;
+		memset(RMC->Lon.lon_dec_degree,0,16);
 	}
 	else
 	{
@@ -392,8 +391,8 @@ static bool RMC_GetLongitude(RMC_Data *RMC,char *Lon_str)
 		RMC->Lon.lon_mmmm = atoi(lon_mmmm);
 		M_m = RMC->Lon.lon_mm + (double)RMC->Lon.lon_mmmm/10000.0;
 		D_d = (double)M_m/60.0;
-		RMC->Lon.lon_dec_degree.int_part = RMC->Lon.lon_ddd;
-		RMC->Lon.lon_dec_degree.dec_part =(long) (D_d*100000000);
+		Decimal_Degree = (double) (RMC->Lon.lon_ddd + D_d);
+		ftoa(Decimal_Degree, RMC->Lon.lon_dec_degree, 8);
 	}
 	return 1;
 }
@@ -429,10 +428,10 @@ void RMC_json_init(RMC_Data *RMC, char *buffer)
 	else sprintf(min_buf,"%d", RMC->Time.mm);
 	if (RMC->Time.ss<10) sprintf(sec_buf,"0%d", RMC->Time.ss);
 	else sprintf(sec_buf,"%d", RMC->Time.ss);
-	sprintf(buffer,"{\"lng\":\"%d.%ld\","
-				   "\"lat\":\"%d.%ld\","
-				   "\"time\":\"%s-%s-%sT%s:%s:%s+00:00\"}",RMC->Lon.lon_dec_degree.int_part,RMC->Lon.lon_dec_degree.dec_part,
-				   RMC->Lat.lat_dec_degree.int_part,RMC->Lat.lat_dec_degree.dec_part,
+	sprintf(buffer,"{\"lng\":\"%s\","
+				   "\"lat\":\"%s\","
+				   "\"time\":\"%s-%s-%sT%s:%s:%s+00:00\"}",RMC->Lon.lon_dec_degree,
+				   RMC->Lat.lat_dec_degree,
 				   year_buf,mon_buf,day_buf,
 				   hour_buf,min_buf,sec_buf);
 }

@@ -24,7 +24,7 @@
 #pragma GCC diagnostic ignored "-Wmissing-declarations"
 #pragma GCC diagnostic ignored "-Wreturn-type"
 // ----------------------------------------------------------------------------
-#define _USE_SIM	0
+#define _USE_SIM	1
 #define _USE_LCD	0
 #define _USE_SDCARD	1
 
