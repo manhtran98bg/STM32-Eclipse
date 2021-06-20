@@ -101,6 +101,8 @@ void RTC_IRQHandler(void)
 {
 	int i=0;
 	__IO uint32_t RTC_cnt=0;
+	unsigned char lat_str_buffer[16]={0};
+	unsigned char lon_str_buffer[16]={0};
 	if (RTC_GetITStatus(RTC_IT_SEC) != RESET)
 	{
 		user_led_toggle();
@@ -113,15 +115,6 @@ void RTC_IRQHandler(void)
 		Time.year = time_struct.tm_year;
 		Time.mon = time_struct.tm_mon;
 		Time.day = time_struct.tm_mday;
-//		if (board_state ==true){
-//			sprintf(buffer,"%d\n",RTC_cnt);
-//			create_time_str(&Time, time_str);
-//			debug_send_string(buffer);
-//		}
-		if (Time.second % 5 == 0){
-			create_time_str(&Time, time_str);
-			trace_puts(time_str);
-		}
 		if (sdcard.mount==true){
 			if (Time.old_day!=Time.day){
 				Time.old_day=Time.day;
@@ -153,9 +146,7 @@ void RTC_IRQHandler(void)
 			if (Time.second % 5 == 0){
 				memset(sd_buffer_location,0,1024);
 				create_time_str(&Time, time_str);
-				sprintf(&sd_buffer_location[0],"%s, %d.%d, %d.%d\r\n",time_str,
-					gps_l70.RMC.Lat.lat_dec_degree.int_part,gps_l70.RMC.Lat.lat_dec_degree.dec_part,
-					gps_l70.RMC.Lon.lon_dec_degree.int_part,gps_l70.RMC.Lon.lon_dec_degree.dec_part);
+				sprintf(&sd_buffer_location[0],"%s, %s, %s\r\n",time_str,gps_l70.RMC.Lat.lat_dec_degree,gps_l70.RMC.Lon.lon_dec_degree);
 				debug_send_string("Write Location to File\n");
 				debug_send_string(sd_buffer_location);
 				write2file(directory,strlen(directory),"LOCATION.LOG",sd_buffer_location,strlen(sd_buffer_location));

@@ -15,6 +15,7 @@
 #include "../sdcard/ff.h"
 #include "../rtc/rtc.h"
 #include "../sdcard/sdmm.h"
+#include "../func.h"
 /*----------------------------------------- Define UART4 ----------------------------------*/
 #define GPS_RST_CLK		RCC_APB2Periph_GPIOC
 #define GPS_RST_PORT	GPIOC
@@ -49,14 +50,14 @@ typedef struct{
     uint8_t	lat_dd;
     uint8_t	lat_mm;
     int	lat_mmmm;
-    dec_degree lat_dec_degree;
+    char lat_dec_degree[16];
 }Latitude;
 
 typedef struct{
     int lon_ddd;
     uint8_t	lon_mm;
     int	lon_mmmm;
-    dec_degree lon_dec_degree;
+    char lon_dec_degree[16];
 }Longitude;
 
 typedef struct{
