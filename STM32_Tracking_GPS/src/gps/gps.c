@@ -105,7 +105,7 @@ void gps_check_current_baud(gps_t *gps)
 			trace_puts(buff_log);
 #endif
 #if _USE_DEBUG_UART
-			sprintf(buff_log,"Check curren baudrate gps L70: BAUD_RATE = %ld\n",baud[i]);
+			sprintf(buff_log,"log: Check curren baudrate gps L70: BAUD_RATE = %ld\n",baud[i]);
 			debug_send_string(buff_log);
 #endif
 			gps->gps_baudrate = baud[i];
@@ -277,7 +277,7 @@ void gps_RxCallback(gps_t *gps){
 	FRESULT	fr;
 	int i=0;
 	c = USART_ReceiveData(GPS_UART);
-	debug_send_chr(c);
+//	debug_send_chr(c);
 	if (c=='$') {	//Start NMEA Sentence
 		flagStart = 1;	//Flag indicate Start of NMEA Sentence
 		gps_buffer_index = 0;

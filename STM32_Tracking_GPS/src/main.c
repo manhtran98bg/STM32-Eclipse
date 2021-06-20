@@ -24,7 +24,7 @@
 #pragma GCC diagnostic ignored "-Wmissing-declarations"
 #pragma GCC diagnostic ignored "-Wreturn-type"
 // ----------------------------------------------------------------------------
-#define _USE_SIM	0
+#define _USE_SIM	1
 #define _USE_LCD	0
 #define _USE_SDCARD	1
 
@@ -74,7 +74,7 @@ bool sub_topic_rx_data_flag = false;
 bool board_state = 0;
 uint32_t time_ping_sver=0;
 uint32_t time_read_data=0;
-uint32_t time_pub[6]={0};
+uint32_t time_pub[8]={0};
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 static void board_init();
@@ -93,6 +93,7 @@ void read_data_sensor_handler();
 void rx_data_subtopic_handler();
 void rfid_handler();
 void pub_data_handler();
+bool rfid_state = false;
 int main(int argc, char* argv[])
 {
 
@@ -110,7 +111,7 @@ int main(int argc, char* argv[])
 	sh1106_Clear(Black);
 	sh1106_UpdateScreen();
 #endif
-	for (int i=0;i<6;i++) time_pub[i] = millis();
+	for (int i=0;i<7;i++) time_pub[i] = millis();
 	time_ping_sver =millis();
 	time_read_data =millis();
 	sub_topic_index = 0;
@@ -157,7 +158,6 @@ int main(int argc, char* argv[])
 //		if (gps_l70.gps_pwr_state == true)	//Neu Module GPS bat
 //		{
 //			if (gps_read_data(&gps_l70)){
-//				sim800.signal_condition = sim_check_signal_condition(&sim800, 200);
 //				if (sim800.mqttServer.connect)	{
 //					if (gps_l70.RMC.Data_Valid[0]!='V') MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
 //					MQTT_Pub(pub_topicList[12].cstring,payload_buf);	//Temp Device
@@ -175,22 +175,33 @@ int main(int argc, char* argv[])
 void rfid_handler()
 {
 	char sd_buffer[128]={0};
+	char log[32]={0};
 	uint8_t str[16]; // Max_LEN = 16
 	uint8_t serNum[5];
 	rfid.present = false;
 	status = MFRC522_Request(PICC_REQIDL, (uchar*)str);
 	if (status == MI_OK) {
-		trace_printf("Find out a card: %x, %x\r\n",str[0],str[1]);
+#if _USE_DEBUG_UART
+		debug_send_string("Find out a card:");
+#endif
+		buzzer_on();
 		status = MFRC522_Anticoll(str);
 		memcpy(serNum, str, 5);
 		for (int i=0;i<5;i++) rfid.serialNumber[i]=serNum[i];
 		date_time2str(sd_buffer, &time_struct);
 		sprintf(&sd_buffer[strlen(sd_buffer)]," ID=%x%x%x%x%x\r\n",
 				serNum[0], serNum[1], serNum[2], serNum[3],serNum[4]);
+		sprintf(log,"%x%x%x%x%x",serNum[0], serNum[1], serNum[2], serNum[3],serNum[4]);
+		MQTT_Pub(pub_topicList[21].cstring, log);
+#if _USE_DEBUG_UART
+		debug_send_string(log);
+		debug_send_chr('\n');
+#endif
 		if (sdcard.mount == true) write2file(directory, strlen(directory), (char*)"ID.txt",sd_buffer,strlen(sd_buffer));
-		rfid.present = true;
 		rfid.t_out = 3;
 		MFRC522_Halt();
+		rfid.present = true;
+		rfid_state = true;
 	}
 }
 void rx_data_subtopic_handler()
@@ -210,16 +221,33 @@ void rx_data_subtopic_handler()
 				memcpy(topic[i],sim800.mqttReceive.topic,sim800.mqttReceive.topicLen-4);
 			if(sim800.mqttReceive.payloadLen>0)
 				memcpy(payload[i],sim800.mqttReceive.payload,sim800.mqttReceive.payloadLen);
-			for (j=0;j<6;j++)
-				if (strcmp((char*)topic[i],pub_topicList[j+15].cstring)==0){
-					MQTT_Pub((char*)topic[i],(char*) payload[i]);
-					if (strstr((char*)payload[i],"undefined")) break;
-					else freq_array[j]=atoi((char*)payload[i]);
-					break;
+			if (rfid_state == false){
+				for (j=0;j<6;j++)
+					if (strcmp((char*)topic[i],pub_topicList[j+15].cstring)==0){
+						MQTT_Pub((char*)topic[i],(char*) payload[i]);
+						if (strstr((char*)payload[i],"undefined")) break;
+						else freq_array[j]=atoi((char*)payload[i]);
+						break;
+					}
+				sprintf(buffer,"%s: %s   %s\n",time_str_buffer,topic[i],payload[i]);
+				write2file(directory, strlen(directory), "REMOTE.LOG", buffer, strlen(buffer));
+				delay_ms(50);
+			}
+			else {
+				if (strcmp((char*)topic[i],pub_topicList[21].cstring) == 0 && strstr((char*)payload[i],"true")){
+					for (int x = 0;x<3;x++){
+						buzzer_on();
+						delay_ms(300);
+					}
 				}
-			sprintf(buffer,"%s: %s   %s\n",time_str_buffer,topic[i],payload[i]);
-			write2file(directory, strlen(directory), "REMOTE.LOG", buffer, strlen(buffer));
-			delay_ms(50);
+				else {
+					for (int x = 0;x<2;x++){
+						buzzer_on();
+						delay_ms(100);
+					}
+				}
+				rfid_state = false;
+			}
 		}
 		clearMqttBuffer();
 		sub_topic_rx_data_flag = false;
@@ -229,49 +257,63 @@ void read_data_sensor_handler()
 {
 	ds18b20_read_temp(&OneWire1, ds18b20);
 	get_vbat(&vbat);
+//	sim800.signal_condition = sim_check_signal_condition(&sim800, 200);
 }
 void pub_data_handler()
 {
 	char payload_buf[20]={0};
 	if ((millis()-time_pub[0])>=freq_array[0]*1000){
 		time_pub[0] = millis();
-#ifdef _USE_DEBUG_UART
-		debug_send_string("log: Pub Device Temp\n");
-#endif
+		#ifdef _USE_DEBUG_UART
+			debug_send_string("log: Pub Device Temp\n");
+		#endif
 		sprintf(payload_buf,"%d",(int)ds18b20[0].temp);
 		MQTT_Pub(pub_topicList[12].cstring,payload_buf);	//Temp Device
 	}
 	if ((millis()-time_pub[1])>=freq_array[1]*1000){
 		time_pub[1] = millis();
-#ifdef _USE_DEBUG_UART
-		debug_send_string("log: Pub Enviroment Temp\n");
-#endif
+		#ifdef _USE_DEBUG_UART
+			debug_send_string("log: Pub Enviroment Temp\n");
+		#endif
+		sprintf(payload_buf,"%d",(int)ds18b20[1].temp);
+		MQTT_Pub(pub_topicList[9].cstring,payload_buf);	//Temp Enviroment
 	}
 	if ((millis()-time_pub[2])>=freq_array[2]*1000){
-#ifdef _USE_DEBUG_UART
-		debug_send_string("log: Pub Enviroment Humidity\n");
-#endif
 		time_pub[2] = millis();
+		#ifdef _USE_DEBUG_UART
+			debug_send_string("log: Pub Enviroment Humidity\n");
+		#endif
 	}
 	if ((millis()-time_pub[3])>=freq_array[3]*1000){
 		time_pub[3] = millis();
 		if (gps_l70.RMC.Data_Valid[0]!='V') MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
-#ifdef _USE_DEBUG_UART
-		debug_send_string("log: Pub Device Location\n");
-#endif
+		#ifdef _USE_DEBUG_UART
+			debug_send_string("log: Pub Device Location\n");
+		#endif
 	}
 	if ((millis()-time_pub[4])>=freq_array[4]*1000){
 		time_pub[4] = millis();
-#ifdef _USE_DEBUG_UART
-		debug_send_string("log: Pub Batery voltage\n");
-#endif
+		#ifdef _USE_DEBUG_UART
+			debug_send_string("log: Pub Batery voltage\n");
+		#endif
+		sprintf(payload_buf,"%d",(int)vbat);
+//		MQTT_Pub(pub_topicList[13].cstring,payload_buf);	//RSSI
 	}
 	if ((millis()-time_pub[5])>=freq_array[5]*1000){
 		time_pub[5] = millis();
-#ifdef _USE_DEBUG_UART
-		debug_send_string("log: Pub Vehicle RPM\n");
-#endif
+		#ifdef _USE_DEBUG_UART
+			debug_send_string("log: Pub Vehicle RPM\n");
+		#endif
 	}
+	if ((millis()-time_pub[6])>=10000){
+		time_pub[6] = millis();
+		#ifdef _USE_DEBUG_UART
+			debug_send_string("log: Pub RSSI\n");
+		#endif
+//		MQTT_Pub(pub_topicList[7].cstring,sim800.rssi);	//RSSI
+	}
+
+
 }
 void init_var()
 {
@@ -364,6 +406,9 @@ void init_pub_topic(MQTTString *topicList,char *topic_buff, char *IMEI){
 
 	sprintf(topic_buff+2000,"mandevices/GSHT_%s/vehicle/rpm/$freq",IMEI);
 	topicList[20].cstring = topic_buff+2000;
+
+	sprintf(topic_buff+2100,"mandevices/GSHT_%s/card/code",IMEI);
+	topicList[21].cstring = topic_buff+2100;
 }
 void init_sub_topic(MQTTString *topicList,char *topic_buff, char *IMEI){
 	sprintf(topic_buff,"mandevices/GSHT_%s/device/temperature/$freq/set",IMEI);
@@ -378,6 +423,8 @@ void init_sub_topic(MQTTString *topicList,char *topic_buff, char *IMEI){
 	topicList[4].cstring = topic_buff+400;
 	sprintf(topic_buff+500,"mandevices/GSHT_%s/vehicle/rpm/$freq/set",IMEI);
 	topicList[5].cstring = topic_buff+500;
+	sprintf(topic_buff+600,"mandevices/GSHT_%s/card/code/set",IMEI);
+	topicList[6].cstring = topic_buff+600;
 }
 void first_pub_topic(MQTTString *topicList)
 {
@@ -399,32 +446,18 @@ void first_pub_topic(MQTTString *topicList)
 		MQTT_Pub(topicList[i+15].cstring,buf);
 		delay_ms(10);
 	}
-//	itoa(freq_array[1],buf,10);
-//	MQTT_Pub(topicList[16].cstring, buf);
-//	delay_ms(50);
-//	itoa(freq_array[2],buf,10);
-//	MQTT_Pub(topicList[17].cstring, buf);
-//	delay_ms(50);
-//	itoa(freq_array[3],buf,10);
-//	MQTT_Pub(topicList[18].cstring, buf);
-//	delay_ms(50);
-//	itoa(freq_array[4],buf,10);
-//	MQTT_Pub(topicList[19].cstring, buf);
-//	delay_ms(50);
-//	itoa(freq_array[5],buf,10);
-//	MQTT_Pub(topicList[20].cstring, buf);
-//	delay_ms(50);
 }
 uint8_t first_sub_topic (MQTTString *topicList)
 {
 	uint8_t	count=0;
-	char buf[32]={0};
-	if (MQTT_Sub(topicList, requestedQoSs, 2)) count ++;
+	char buf[64]={0};
+	if (MQTT_Sub(topicList, requestedQoSs, 2)) count = count +2;
 	delay_ms(10);
-	if (MQTT_Sub(&topicList[2], requestedQoSs, 2)) count++;
+	if (MQTT_Sub(&topicList[2], requestedQoSs, 2)) count = count +2;
 	delay_ms(10);
-	if (MQTT_Sub(&topicList[4], requestedQoSs, 2)) count++;
-	sprintf(buf,"Number of Topic Subcribed = %d\n",count*2);
+	if (MQTT_Sub(&topicList[4], requestedQoSs, 2)) count = count +2;
+	if (MQTT_Sub(&topicList[6], 0, 1)) count = count +1;
+	sprintf(buf,"log: Number of Topic Subcribed = %d\n",count);
 #if _DEBUG
 	trace_puts(buf);
 #endif
@@ -441,6 +474,7 @@ static void sim_start(){
 #endif
 		init_pub_topic(pub_topicList, (char*)pub_topic, (char*)sim800.sim_id.imei);
 		init_sub_topic(sub_topicList, (char*)sub_topic, (char*)sim800.sim_id.imei);
+		sim800.mqttClient.clientID = sim800.sim_id.imei;
 #if _USE_LCD
 		sh1106_WriteString(2, 10, "-SETUP TCP:", Font_6x8, White, ALIGN_LEFT);
 		sh1106_UpdateScreen();

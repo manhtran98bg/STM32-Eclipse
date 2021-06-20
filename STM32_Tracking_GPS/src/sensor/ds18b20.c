@@ -415,7 +415,7 @@ uint8_t ds18b20_init(TM_OneWire_t* OneWireStruct, ds18b20_t *ds18b20)
     	trace_puts("No sensor on OneWire.");
 #endif
 #if _USE_DEBUG_UART
-    	debug_send_string("No sensor on OneWire.\n");
+    	debug_send_string("log: No sensor on OneWire.\n");
 #endif
     }
     /* Go through all connected devices and set resolution to 9bits */

@@ -37,4 +37,5 @@ void tim4_init();
 void user_led_toggle();
 void user_led_init();
 void btn_init();
+extern void buzzer_on();
 #endif /* BOARD_BOARD_H_ */

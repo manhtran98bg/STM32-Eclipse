@@ -78,7 +78,7 @@ void user_led_init()
 {
 	GPIO_InitTypeDef GPIO_init_struct;
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOA, ENABLE);
-	GPIO_init_struct.GPIO_Pin = USER_LED;
+	GPIO_init_struct.GPIO_Pin = USER_LED|BUZZER;
 	GPIO_init_struct.GPIO_Mode = GPIO_Mode_Out_PP;
 	GPIO_init_struct.GPIO_Speed = GPIO_Speed_50MHz;
 	GPIO_Init(GPIOA, &GPIO_init_struct);
@@ -86,6 +86,11 @@ void user_led_init()
 void user_led_toggle()
 {
 	GPIOA->ODR ^=(uint32_t)(USER_LED);
+}
+void buzzer_on(){
+	GPIOA->ODR |=BUZZER;
+	delay_ms(50);
+	GPIOA->ODR &=~BUZZER;
 }
 void btn_init(){
 	RCC_APB2PeriphClockCmd(RCC_APB2Periph_GPIOB, ENABLE);

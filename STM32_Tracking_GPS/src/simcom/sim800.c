@@ -293,7 +293,6 @@ static void sim_log(char* log)
 #endif
 #if _USE_DEBUG_UART
 	debug_send_string(log);
-	debug_send_chr('\n');
 #endif
 }
 /*	Check Response SIM800C
@@ -310,7 +309,7 @@ static uint8_t sim_check_response(char num_try, int timeout_ms)
 	for (repeat=0;repeat<num_try;repeat++)
 	{
 		time_out=0;
-		sim_log("Check SIM Response.");
+		sim_log("log: Check SIM Response: ");
 		sim_send_cmd((char*)"AT\r\n", 100);
 		do{
 			r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n");
@@ -318,14 +317,14 @@ static uint8_t sim_check_response(char num_try, int timeout_ms)
 			delay_ms(100);
 		}while ((time_out<(timeout_ms/100))&&(!r));
 		if (time_out>=10){
-			sim_log("SIM not Response. Try again.");
+			sim_log("SIM not Response. Try again.\n");
 		}
 		else {
-			sim_log("SIM Responsed.");
+			sim_log("OK.\n");
 			return 1;
 		}
 	}
-	sim_log("SIM not Response.");
+	sim_log("log: SIM not Response.\n");
 	return 0;
 
 }
@@ -341,7 +340,7 @@ static uint8_t sim_check_simcard(char num_try, int timeout_ms)
 	//Check SIM Card
 	for (repeat=0;repeat<num_try;repeat++)
 	{
-		sim_log("Check SIM CARD.");
+		sim_log("log: Check SIM CARD: ");
 		time_out = 0;
 		sim_send_cmd((char*)"AT+CPIN?\r\n", 100);
 		do{
@@ -350,14 +349,14 @@ static uint8_t sim_check_simcard(char num_try, int timeout_ms)
 			delay_ms(100);
 		}while ((time_out<(timeout_ms/100))&&(!r));
 		if (time_out>=(timeout_ms/100)){
-			sim_log("No SIM CARD. Try again.");
+			sim_log("No SIM CARD. Try again.\n");
 		}
 		else {
-			sim_log("SIM CARD OK.");
+			sim_log("OK.\n");
 			return 1;
 		}
 	}
-	sim_log("No SIM CARD.");
+	sim_log("log: No SIM CARD.\n");
 	return 0;
 
 }
@@ -370,11 +369,13 @@ signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms)
 	char rssi_buff[4]={0};
 	char *temp;
 	char signal_str[3]={0};
+	sim800->send_state = SENDING;
 	do {
 		r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n");
 		time_out++;
 		delay_ms(50);
 	}while ((time_out<(timeout_ms/50))&&(!r));
+	sim800->send_state = SENT;
 	if (time_out>=(timeout_ms/50)) return NORESPONSE;
 	temp = strstr((char*)sim_buffer,(char*)"+CSQ:");
 	if (temp!=NULL)
@@ -416,7 +417,7 @@ static uint8_t sim_check_reg(char num_try, int timeout_ms)
 	//Check SIM Registration status
 	for (repeat=0;repeat<num_try;repeat++)
 	{
-		sim_log("Check SIM Registration status.");
+		sim_log("log: Check SIM Registration status: ");
 		time_out = 0;
 		sim_send_cmd((char*)"AT+CREG?\r\n", 100);
 		do{
@@ -425,14 +426,14 @@ static uint8_t sim_check_reg(char num_try, int timeout_ms)
 			delay_ms(100);
 		}while ((time_out<(timeout_ms/100))&&(!r));
 		if (time_out>=(timeout_ms/100)){
-			sim_log("Not registered. Try again.");
+			sim_log("Not registered. Try again.\n");
 		}
 		else {
-			sim_log("Registered.");
+			sim_log("Registered.\n");
 			return 1;
 		}
 	}
-	sim_log("Not registered.");
+	sim_log("log: SIM not registered.\n");
 	return 0;
 }
 /* Ket noi GPRS
@@ -447,7 +448,7 @@ uint8_t sim_attach_gprs(char num_try, int timeout_ms)
 	u8 repeat = 0;
 	for(repeat = 0;repeat<num_try;repeat++)
 	{
-		sim_log("Try to Attach GPRS Service...");
+		sim_log("log: Try to Attach GPRS Service: ");
 		time_out = 0;
 		sim_send_cmd((char*)"AT+CGATT=1\r\n", 200);
 		do{
@@ -456,13 +457,13 @@ uint8_t sim_attach_gprs(char num_try, int timeout_ms)
 			time_out++;
 		}while ((time_out<(timeout_ms/100))&&(!r));
 		if (time_out>=(timeout_ms/100)){
-			sim_log("Attach GPRS Service:FAILED. Try again");
+			sim_log("FAILED. Try again.\n");
 		}
-		else {sim_log("Attach GPRS Service:SUCCESSED");
+		else {sim_log("SUCCESSED.\n");
 		return 1;
 		}
 	}
-	sim_log("Attach GPRS Service:FAILED.");
+	sim_log("log: Attach GPRS Service: FAILED.\n");
 	return 0;
 }
 /* Ngat ket noi GPRS
@@ -477,7 +478,7 @@ uint8_t sim_detach_gprs(char num_try, int timeout_ms)
 	u8 repeat = 0;
 	for(repeat = 0;repeat<num_try;repeat++)
 	{
-		sim_log("Try to Deactive GPRS Service...");
+		sim_log("log: Try to Deactive GPRS Service: ");
 		time_out = 0;
 		sim_send_cmd((char*)"AT+CIPSHUT\r\n", 200);
 		do{
@@ -487,14 +488,14 @@ uint8_t sim_detach_gprs(char num_try, int timeout_ms)
 		}while ((time_out<(timeout_ms/100))&&(!r));
 		sim800.simState = sim_current_connection_status();
 		if (time_out>=(timeout_ms/100)){
-			sim_log("Deactive GPRS Service:FAILED. Try again");
+			sim_log("FAILED. Try again.\n");
 		}
 		else {
-			sim_log("Deactive GPRS Service:SUCCESSED");
+			sim_log("SUCCESSED.\n");
 			return 1;
 		}
 	}
-	sim_log("Deactive GPRS Service:FAILED.");
+	sim_log("log: Deactive GPRS Service: FAILED.\n");
 	return 0;
 }
 static uint8_t sim_set_APN(SIM800_t *sim800, char num_try, int timeout_ms)
@@ -505,7 +506,7 @@ static uint8_t sim_set_APN(SIM800_t *sim800, char num_try, int timeout_ms)
 	char str[64];
 	for(repeat = 0;repeat<num_try;repeat++)
 	{
-		sim_log("Try to Set APN...");
+		sim_log("log: Try to Set APN: ");
 		time_out=0;
 		snprintf(str,sizeof(str),"AT+CSTT=\"%s\",\"%s\",\"%s\"\r\n",sim800->sim.apn,sim800->sim.apn_user,sim800->sim.apn_pass);
 		sim_send_cmd((char*)str, 200);
@@ -515,14 +516,14 @@ static uint8_t sim_set_APN(SIM800_t *sim800, char num_try, int timeout_ms)
 			time_out++;
 		}while ((time_out<(timeout_ms/100))&&(!r));
 		if (time_out>=(timeout_ms/100)){
-			sim_log("Set APN:FAILED. Try again.");
+			sim_log("FAILED. Try again.\n");
 		}
 		else {
-			sim_log("Set APN:SUCCESSED");
+			sim_log("SUCCESSED.\n");
 			return 1;
 		}
 	}
-	sim_log("Set APN:FAILED.");
+	sim_log("log: Set APN: FAILED.\n");
 	return 0;
 }
 static uint8_t sim_bringup_wireless_connection(char num_try, int timeout_ms)
@@ -533,7 +534,7 @@ static uint8_t sim_bringup_wireless_connection(char num_try, int timeout_ms)
 	for (repeat=0;repeat<num_try;repeat++)
 	{
 		time_out = 0;
-		sim_log("Bring up wireless connection.");
+		sim_log("log: Bring up wireless connection: ");
 		sim_send_cmd((char*)"AT+CIICR\r\n", 100);
 		do{
 			r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n");
@@ -541,14 +542,14 @@ static uint8_t sim_bringup_wireless_connection(char num_try, int timeout_ms)
 			delay_ms(100);
 		}while ((time_out<(timeout_ms/100))&&(!r));
 		if (time_out>=(timeout_ms/100)){
-			sim_log("Bring up wireless connection:FAILED. Try again.");
+			sim_log("FAILED. Try again.\n");
 		}
 		else {
-			sim_log("Bring up wireless connection:SUCCESSED.");
+			sim_log("SUCCESSED.\n");
 			return 1;
 		}
 	}
-	sim_log("Bring up wireless connection:FAILED.");
+	sim_log("log: Bring up wireless connection: FAILED.\n");
 	return 0;
 }
 static uint8_t sim_get_local_IP(char num_try, int timeout_ms)
@@ -560,7 +561,7 @@ static uint8_t sim_get_local_IP(char num_try, int timeout_ms)
 	for (repeat=0;repeat<num_try;repeat++)
 	{
 		time_out = 0;
-		sim_log("Get Local IP Address.");
+		sim_log("log: Get Local IP Address: ");
 		sim_send_cmd((char*)"AT+CIFSR\r\n",100);
 		do{
 			r = sim_check_cmd((char*)sim_buffer, (char*)"ERROR\r\n");
@@ -568,16 +569,16 @@ static uint8_t sim_get_local_IP(char num_try, int timeout_ms)
 			delay_ms(100);
 		}while ((time_out<(timeout_ms/100))&&(r));
 		if (time_out>=(timeout_ms/100)){
-			sim_log("Can not get Local IP Address. Try again");
+			sim_log("FAILED. Try again.\n");
 		}
 		else {
 			memset(buff,0,40);
-			sprintf((char*)buff,"Your Local IP Address: %s",sim_buffer);
+			sprintf((char*)buff,"%s",&sim_buffer[1]);
 			sim_log((char*)buff);
 			return 1;
 		}
 	}
-	sim_log("Can not get Local IP Address!");
+	sim_log("log: Can't get Local IP Address.\n");
 	return 0;
 }
 
@@ -704,7 +705,7 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 	u8 repeat = 0;
 	char buff[128]={0};
 	memset(buff,0,128);
-	sprintf((char*)buff,"Start connecting to: %s:%d",sim800->mqttServer.host,sim800->mqttServer.port);
+	sprintf((char*)buff,"log: Start connecting to: %s:%d: ",sim800->mqttServer.host,sim800->mqttServer.port);
 	sim_log((char*)buff);
 	for (repeat=0;repeat<num_try;repeat++)
 	{
@@ -721,13 +722,13 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 			sim800->tcp_connect=false;
 			sim800->simState = sim_current_connection_status();
 			memset(buff,0,128);
-			sprintf((char*)buff,"Connecting to: %s:%d: FAILED. Try again",sim800->mqttServer.host,sim800->mqttServer.port);
+			sprintf((char*)buff,"FAILED. Try again\n",sim800->mqttServer.host,sim800->mqttServer.port);
 			sim_log((char*)buff);
 			sim_disconnect_server(sim800);
 		}
 		else {
 			memset(buff,0,128);
-			sprintf((char*)buff,"Connecting to: %s:%d: SUCCESS",sim800->mqttServer.host,sim800->mqttServer.port);
+			sprintf((char*)buff,"SUCCESS\n",sim800->mqttServer.host,sim800->mqttServer.port);
 			sim_log((char*)buff);
 			sim800->tcp_connect = true;
 			sim800->simState = sim_current_connection_status();
@@ -735,7 +736,7 @@ uint8_t sim_connect_server(SIM800_t *sim800, char num_try, int timeout_ms)
 		}
 	}
 	memset(buff,0,128);
-	sprintf((char*)buff,"Connecting to: %s:%d: FAILED",sim800->mqttServer.host,sim800->mqttServer.port);
+	sprintf((char*)buff,"log: Connecting to: %s:%d: FAILED\n",sim800->mqttServer.host,sim800->mqttServer.port);
 	sim_log((char*)buff);
 	sim800->mqttServer.connect = false;
 	sim800->simState = sim_current_connection_status();
@@ -854,6 +855,7 @@ void sim_reconnect_handler(SIM800_t *sim800)
 }
 uint8_t MQTT_Connect(SIM800_t *sim800){
 	unsigned char buf[128] = {0};
+	uint32_t time_out=0;
 	sim800->mqttReceive.newEvent = false;
 	sim800->mqttServer.connect = false;
 	if (sim800->tcp_connect == true)
@@ -870,18 +872,19 @@ uint8_t MQTT_Connect(SIM800_t *sim800){
 		datas.will.topicName.cstring = pub_topicList[1].cstring;
 		datas.will.message.cstring = "lost";
 		int data_len = MQTTSerialize_connect(buf, sizeof(buf), &datas);
-//		sim_send_cmd((char*)"AT+CIPSEND\r\n", 200);
-//		sim_uart_send_array((unsigned char*)buf,data_len);
-//		sim_uart_send_char(0x1A);
-//		delay_ms(500);
-//		if (MQTT_PingReq(sim800)) return 1;
-//		else return 0;
 		memset(res_packet_buffer,0,32);
 	    res_packet_index=0;
 	    sim800->send_packet.name = CONNECT;
 	    sim800->send_packet.flag = 1;
 	    sim_send_message(buf, data_len);
-	    while (res_packet_index<4);
+	    time_out = millis();
+	    while (res_packet_index<4){
+	    	if (millis()-time_out>3000){
+	    		sim800->mqttServer.connect = false;
+	    		return 0;
+	    	}
+	    	else delay_ms(10);
+	    }
 	    sim800->res_packet.flag = 0 ;
 	    if (res_packet_buffer[3]==0x00) {
 	    	sim800->mqttServer.connect = true;
@@ -910,6 +913,7 @@ uint8_t MQTT_PingReq(SIM800_t *sim800)
     		sim800->mqttServer.connect = false;
     		return 0;
     	}
+    	else delay_ms(10);
     }
     sim800->res_packet.flag = 0 ;
     if (res_packet_buffer[1]==0x00) {
