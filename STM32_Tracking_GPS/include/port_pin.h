@@ -11,6 +11,7 @@
 #include "stm32f10x.h"
 
 #define USER_LED	GPIO_Pin_8				//PA8
+#define BUZZER		GPIO_Pin_1
 
 #define USER_BTN1	GPIO_Pin_12				//PB12
 #define USER_BTN2	GPIO_Pin_13				//PB13
