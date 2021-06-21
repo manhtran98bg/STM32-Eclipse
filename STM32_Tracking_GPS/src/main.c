@@ -75,6 +75,7 @@ bool board_state = 0;
 uint32_t time_ping_sver=0;
 uint32_t time_read_data=0;
 uint32_t time_pub[8]={0};
+uint32_t ping_interval = 10000;
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 static void board_init();
@@ -116,24 +117,46 @@ int main(int argc, char* argv[])
 	time_read_data =millis();
 	sub_topic_index = 0;
 	board_state = true;
+	uint8_t ping_cnt = 0;
 	while(1)
 	{
 #if _USE_SIM
-		if (millis()-time_ping_sver>10000)
+		if (millis()-time_ping_sver>ping_interval)
 		{
 			time_ping_sver = millis();
-			if(MQTT_PingReq(&sim800)) {
+			if(MQTT_PingReq(&sim800)) {		//reset cac thong so, xac nhan van co ket noi voi broker
 				#if _USE_DEBUG_UART
-					debug_send_string("PING OK..\n");
+					debug_send_string("log: PING OK..\n");
 				#endif
+				sim800.mqttServer.ping_flag = true;
+				ping_cnt = 0;
+				ping_interval = 10000;
 			}
-			else {
+			else {		//tang so lan ping, neu ping_count = 5 => reconnect;
 				#if _USE_DEBUG_UART
-					debug_send_string("PING FAIL..\n");
+					debug_send_string("log: PING FAIL..\n");
 				#endif
+				sim800.mqttServer.ping_flag = false;
+				ping_interval = 2000;
+				ping_cnt++;
+			}
+			if (ping_cnt>=5){
+				#if _USE_DEBUG_UART
+					debug_send_string("log: Run Reconnect Handler.\n");
+				#endif
+				sim_disconnect_server(&sim800);
+				if (sim_detach_gprs(5, 1000)){
+					sim_attach_gprs(5, 1000);
+					if (sim_connect_server(&sim800, 5, 1000)) {
+						MQTT_Connect(&sim800);
+						first_pub_topic(pub_topicList);
+						first_sub_topic(sub_topicList);
+						ping_cnt = 0;
+					}
+				}
 			}
 		}
-		if (millis()-time_read_data>1000){	//2S doc data 1 lan
+		if (millis()-time_read_data>2000){	//2S doc data 1 lan
 			time_read_data=millis();
 			read_data_sensor_handler();
 		}
@@ -143,28 +166,6 @@ int main(int argc, char* argv[])
         if (sub_topic_rx_data_flag == true){
         	rx_data_subtopic_handler();
         }
-#endif
-#if _USE_SIM
-		if (sim800.power_state == ON)	//Neu module SIM bat
-		{
-//			if (millis() - t_check_connection>=10000) {
-//				t_check_connection = millis();
-//				sim_nosignal_handler(&sim800);
-//			}
-//			if (nosignal_check==1) {
-//				sim_reconnect_handler(&sim800);
-//			}
-		}
-//		if (gps_l70.gps_pwr_state == true)	//Neu Module GPS bat
-//		{
-//			if (gps_read_data(&gps_l70)){
-//				if (sim800.mqttServer.connect)	{
-//					if (gps_l70.RMC.Data_Valid[0]!='V') MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
-//					MQTT_Pub(pub_topicList[12].cstring,payload_buf);	//Temp Device
-//					MQTT_Pub(pub_topicList[7].cstring,sim800.rssi);	//RSSI
-//				}
-//			}
-//		}
 #endif
 		if (rfid.t_out==0){
 			rfid_handler();
@@ -221,6 +222,9 @@ void rx_data_subtopic_handler()
 				memcpy(topic[i],sim800.mqttReceive.topic,sim800.mqttReceive.topicLen-4);
 			if(sim800.mqttReceive.payloadLen>0)
 				memcpy(payload[i],sim800.mqttReceive.payload,sim800.mqttReceive.payloadLen);
+			sprintf(buffer,"%s: %s   %s\n",time_str_buffer,topic[i],payload[i]);
+			write2file(directory, strlen(directory), "REMOTE.LOG", buffer, strlen(buffer));
+			delay_ms(10);
 			if (rfid_state == false){
 				for (j=0;j<6;j++)
 					if (strcmp((char*)topic[i],pub_topicList[j+15].cstring)==0){
@@ -229,9 +233,6 @@ void rx_data_subtopic_handler()
 						else freq_array[j]=atoi((char*)payload[i]);
 						break;
 					}
-				sprintf(buffer,"%s: %s   %s\n",time_str_buffer,topic[i],payload[i]);
-				write2file(directory, strlen(directory), "REMOTE.LOG", buffer, strlen(buffer));
-				delay_ms(50);
 			}
 			else {
 				if (strcmp((char*)topic[i],pub_topicList[21].cstring) == 0 && strstr((char*)payload[i],"true")){
@@ -257,7 +258,8 @@ void read_data_sensor_handler()
 {
 	ds18b20_read_temp(&OneWire1, ds18b20);
 	get_vbat(&vbat);
-//	sim800.signal_condition = sim_check_signal_condition(&sim800, 200);
+	sim800.signal_condition = sim_check_signal_condition(&sim800, 500);
+
 }
 void pub_data_handler()
 {
@@ -297,7 +299,7 @@ void pub_data_handler()
 			debug_send_string("log: Pub Batery voltage\n");
 		#endif
 		sprintf(payload_buf,"%d",(int)vbat);
-//		MQTT_Pub(pub_topicList[13].cstring,payload_buf);	//RSSI
+		MQTT_Pub(pub_topicList[13].cstring,payload_buf);	//RSSI
 	}
 	if ((millis()-time_pub[5])>=freq_array[5]*1000){
 		time_pub[5] = millis();
@@ -310,7 +312,7 @@ void pub_data_handler()
 		#ifdef _USE_DEBUG_UART
 			debug_send_string("log: Pub RSSI\n");
 		#endif
-//		MQTT_Pub(pub_topicList[7].cstring,sim800.rssi);	//RSSI
+		MQTT_Pub(pub_topicList[7].cstring,sim800.rssi);	//RSSI
 	}
 
 

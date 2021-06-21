@@ -83,6 +83,7 @@ typedef struct {
     char *host;
     uint16_t port;
     bool connect;
+    bool ping_flag;
 } mqttServer_t;
 
 typedef struct {

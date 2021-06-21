@@ -362,6 +362,7 @@ static uint8_t sim_check_simcard(char num_try, int timeout_ms)
 }
 signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms)
 {
+	sim800->send_state = SENDING;
 	sim_send_cmd((char*)"AT+CSQ\r\n", 50);
 	u8 time_out=0;
 	u8 r=0;
@@ -369,7 +370,6 @@ signal_t sim_check_signal_condition(SIM800_t *sim800, int timeout_ms)
 	char rssi_buff[4]={0};
 	char *temp;
 	char signal_str[3]={0};
-	sim800->send_state = SENDING;
 	do {
 		r = sim_check_cmd((char*)sim_buffer, (char*)"OK\r\n");
 		time_out++;
@@ -770,7 +770,7 @@ uint8_t sim_disconnect_server(SIM800_t* sim800)
 	u8 time_out=0;
 	u8 r=0;
 	if (sim800->simState==CONNECT_OK){
-		sim_log("Close TCP connection.");
+		sim_log("log: Close TCP connection.");
 		time_out = 0;
 		sim_send_cmd((char*)"AT+CIPCLOSE\r\n", 1000);
 		do{
@@ -780,13 +780,15 @@ uint8_t sim_disconnect_server(SIM800_t* sim800)
 		}while ((time_out<30)&&(!r));
 		sim800->simState = sim_current_connection_status();
 		if (time_out>=30){
-			sim_log("Close TCP connection: FAILED.");
+			sim_log("FAILED.\n");
 			return 0;
 		}
-		sim_log("Close TCP connection: SUCCESSED.");
-		sim800->mqttServer.connect = false;
-		sim800->tcp_connect = false;
-		return 1;
+		else {
+			sim_log("SUCCESSED.\n");
+			sim800->mqttServer.connect = false;
+			sim800->tcp_connect = false;
+			return 1;
+		}
 	}
 	return 0;
 }
@@ -795,15 +797,16 @@ uint8_t sim_nosignal_handler(SIM800_t *sim800)
 	u8 ping_res=0;
 	//Check Signal Condition
 	ping_res = MQTT_PingReq(sim800);
+	sim800->signal_condition = sim_check_signal_condition(&sim800, 500);
 		if (sim800->signal_condition<=MARGINAL && sim800->tcp_connect == true && ping_res==0){
 	#if _USE_DEBUG_UART
-			debug_send_string((char*)"Check connection with MQTT Broker: ");
+			debug_send_string((char*)"log: Check connection with MQTT Broker: ");
 	#endif
 			ping_res = MQTT_PingReq(sim800);
 			if (ping_res==0 ){	//Poor Signal Condition.
 	#if _USE_DEBUG_UART
 				debug_send_string((char*)"Poor Signal Condition.\n");
-				debug_send_string((char*)"Disconnecting from MQTT Broker.\n");
+				debug_send_string((char*)"log: Disconnecting from MQTT Broker.\n");
 	#endif
 				sim_disconnect_server(sim800);	//Ngat ket noi TCP/IP
 				sim800->simState = sim_current_connection_status();	//Check TCP/IP status
