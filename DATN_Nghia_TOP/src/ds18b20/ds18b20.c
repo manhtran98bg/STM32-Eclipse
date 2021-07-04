@@ -4,7 +4,7 @@
  *  Created on: May 12, 2021
  *      Author: manht
  */
-#include "ds18b20.h"
+#include <ds18b20/ds18b20.h>
 // ----------------------------------------------------------------------------
 ds18b20_t ds18b20;
 static void ds18_gpio_input()

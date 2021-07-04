@@ -5,8 +5,8 @@
  *      Author: manht
  */
 
-#ifndef SENSOR_DS18B20_H_
-#define SENSOR_DS18B20_H_
+#ifndef DS18B20_DS18B20_H_
+#define DS18B20_DS18B20_H_
 
 #include "main.h"
 #include "../service/delay.h"
@@ -44,4 +44,4 @@ uint8_t ds18_read();
 void ds18_read_temp(ds18b20_t *ds18b20);
 void ds18_config(uint8_t resolution);
 void ds18_read_id(ds18b20_t *ds18b20);
-#endif /* SENSOR_DS18B20_H_ */
+#endif /* DS18B20_DS18B20_H_ */
