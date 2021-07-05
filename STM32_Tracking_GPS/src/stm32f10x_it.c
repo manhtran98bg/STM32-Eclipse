@@ -8,6 +8,7 @@
 #include "rfid/mfrc552.h"
 #include "sdcard/sdmm.h"
 #include "rs232/rs232.h"
+#include "backup/driver.h"
 volatile uint32_t msTicks=0;
 volatile uint32_t myTicks_tim4=0;
 volatile uint32_t uwTick=0;
@@ -105,6 +106,8 @@ void RTC_IRQHandler(void)
 	unsigned char lon_str_buffer[16]={0};
 	if (RTC_GetITStatus(RTC_IT_SEC) != RESET)
 	{
+		if (driver.is_active == true) driver.active_time++;
+		else driver.active_time = 0;
 		user_led_toggle();
 		RTC_cnt = RTC_GetCounter();
 		if ((rfid.present == true)&&(rfid.t_out>0)) rfid.t_out--;	//Cho t_out de doc RFID
@@ -133,8 +136,8 @@ void RTC_IRQHandler(void)
 				gps_speed_count = 0;
 				i = strlen (sd_buffer_speed);
 				sprintf(&sd_buffer_speed[i],"%d\n",(int)gps_l70.RMC.Speed);
-				debug_send_string("Write Speed to File\n");
-				debug_send_string(sd_buffer_speed);
+//				debug_send_string("Write Speed to File\n");
+//				debug_send_string(sd_buffer_speed);
 				write2file(directory, strlen(directory), "SPEED.LOG",sd_buffer_speed, strlen (sd_buffer_speed));
 			}
 			else {
@@ -147,8 +150,8 @@ void RTC_IRQHandler(void)
 				memset(sd_buffer_location,0,1024);
 				create_time_str(&Time, time_str);
 				sprintf(&sd_buffer_location[0],"%s, %s, %s\r\n",time_str,gps_l70.RMC.Lat.lat_dec_degree,gps_l70.RMC.Lon.lon_dec_degree);
-				debug_send_string("Write Location to File\n");
-				debug_send_string(sd_buffer_location);
+//				debug_send_string("Write Location to File\n");
+//				debug_send_string(sd_buffer_location);
 				write2file(directory,strlen(directory),"LOCATION.LOG",sd_buffer_location,strlen(sd_buffer_location));
 			}
 		}

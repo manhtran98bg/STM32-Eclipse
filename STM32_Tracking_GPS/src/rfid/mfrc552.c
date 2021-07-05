@@ -145,7 +145,7 @@ void MFRC522_SPI_Init(void)
 	GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN_FLOATING;
 	GPIO_Init(MFRC522_SPI_GPIO, &GPIO_InitStruct);
 
-	SPI_InitStruct.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_16;
+	SPI_InitStruct.SPI_BaudRatePrescaler = SPI_BaudRatePrescaler_128;
 	SPI_InitStruct.SPI_Direction= SPI_Direction_2Lines_FullDuplex;
 	SPI_InitStruct.SPI_Mode = SPI_Mode_Master;
 	SPI_InitStruct.SPI_DataSize = SPI_DataSize_8b;

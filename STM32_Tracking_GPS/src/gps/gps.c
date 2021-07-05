@@ -346,6 +346,7 @@ static bool RMC_GetLatitude(RMC_Data *RMC,char *Lat_str)
 		RMC->Lat.lat_mm = 0;
 		RMC->Lat.lat_mmmm = 0;
 		memset(RMC->Lat.lat_dec_degree,0,16);
+		memcpy(RMC->Lat.lat_dec_degree,"20.99948333",11);
 	}
 	else
 	{
@@ -378,6 +379,7 @@ static bool RMC_GetLongitude(RMC_Data *RMC,char *Lon_str)
 		RMC->Lon.lon_mm = 0;
 		RMC->Lon.lon_mmmm = 0;
 		memset(RMC->Lon.lon_dec_degree,0,16);
+		memcpy(RMC->Lon.lon_dec_degree,"105.84145671",12);
 	}
 	else
 	{

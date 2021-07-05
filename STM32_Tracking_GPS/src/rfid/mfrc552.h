@@ -137,7 +137,8 @@
 typedef struct{
 	int t_out;		//Sec
 	bool present;
-	char serialNumber[5];
+	uint8_t serialNumber[5];
+	bool valid;
 }RFID_t;
 extern RFID_t rfid;
 // Cac ham su dung

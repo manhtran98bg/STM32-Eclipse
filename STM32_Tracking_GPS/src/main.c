@@ -17,6 +17,7 @@
 #include "board/board.h"
 #include "voltage/adc.h"
 #include "rs232/rs232.h"
+#include "backup/driver.h"
 // ----------------------------------------------------------------------------
 
 #pragma GCC diagnostic push
@@ -94,6 +95,7 @@ void read_data_sensor_handler();
 void rx_data_subtopic_handler();
 void rfid_handler();
 void pub_data_handler();
+void driver_get_bkp_data();
 bool rfid_state = false;
 int main(int argc, char* argv[])
 {
@@ -102,6 +104,7 @@ int main(int argc, char* argv[])
 	//Init first variable.
 	init_var();
 	board_init();
+	driver_get_bkp_data();
 #if _USE_LCD
 	lcd_start();
 #endif
@@ -118,6 +121,7 @@ int main(int argc, char* argv[])
 	sub_topic_index = 0;
 	board_state = true;
 	uint8_t ping_cnt = 0;
+
 	while(1)
 	{
 #if _USE_SIM
@@ -173,32 +177,110 @@ int main(int argc, char* argv[])
 	}
 	return 0;
 }
+void driver_get_bkp_data(){
+	driver.is_active = driver_get_bkp_active();
+	if (driver.is_active == false) {
+		memset(driver.id,0,6);
+		driver_write_bkp_id(driver.id);
+		driver.active_time = 0;
+		driver_write_bkp_time(driver.active_time);
+	}
+	else {
+		driver_get_bkp_id(driver.id);
+		driver.active_time = driver_get_bkp_time();
+	}
+}
 void rfid_handler()
 {
 	char sd_buffer[128]={0};
-	char log[32]={0};
+	char str_id[32]={0};
 	uint8_t str[16]; // Max_LEN = 16
-	uint8_t serNum[5];
+	uint8_t serNum[5],i = 0;
 	rfid.present = false;
+	uint32_t time_out = 0;
+	char driver_topic[128]={0};
+	char driver_payload[128]={0};
 	status = MFRC522_Request(PICC_REQIDL, (uchar*)str);
 	if (status == MI_OK) {
-#if _USE_DEBUG_UART
-		debug_send_string("Find out a card:");
-#endif
-		buzzer_on();
 		status = MFRC522_Anticoll(str);
 		memcpy(serNum, str, 5);
-		for (int i=0;i<5;i++) rfid.serialNumber[i]=serNum[i];
-		date_time2str(sd_buffer, &time_struct);
-		sprintf(&sd_buffer[strlen(sd_buffer)]," ID=%x%x%x%x%x\r\n",
-				serNum[0], serNum[1], serNum[2], serNum[3],serNum[4]);
-		sprintf(log,"%x%x%x%x%x",serNum[0], serNum[1], serNum[2], serNum[3],serNum[4]);
-		MQTT_Pub(pub_topicList[21].cstring, log);
+
 #if _USE_DEBUG_UART
-		debug_send_string(log);
+		debug_send_string("log: Find out a card, ID = ");
+		sprintf(str_id,"%x%x%x%x%x",serNum[0], serNum[1], serNum[2], serNum[3],serNum[4]);
+		debug_send_string(str_id);
 		debug_send_chr('\n');
 #endif
-		if (sdcard.mount == true) write2file(directory, strlen(directory), (char*)"ID.txt",sd_buffer,strlen(sd_buffer));
+		buzzer_on();
+		memcpy(rfid.serialNumber,str,5);
+		while(i<5){
+			if (rfid.serialNumber[i]!=driver.id[i]) break;
+			else i++;
+		}
+		if (i>=5) {
+			debug_send_string("log: same card ");
+			if (driver.is_active==true){	// the dang dang nhap
+				driver.is_active = false;
+				memset(driver.id,0,6);
+				debug_send_string("=> log out\n");
+				sprintf(driver_topic,"mandevices/GSHT_%s/card/%s/active_time",sim800.sim_id.imei,str_id);
+				memset(driver_payload,0,128);
+				driver_payload_checkout(str_id, &gps_l70.RMC, driver.active_time, driver_payload);
+				MQTT_Pub(driver_topic, driver_payload);
+			}
+		}
+		else {
+			debug_send_string("log: different card ");
+			if (driver.is_active==false){//the chua dang nhap
+				/*
+				 * Gui ID len server va doi phan hoi, neu the hop le
+				 */
+				clearMqttBuffer();
+				memset(driver_payload,0,128);
+				driver_payload_checkin(str_id, &gps_l70.RMC, driver_payload);
+				MQTT_Pub(pub_topicList[21].cstring, driver_payload);
+				time_out = millis();
+				//Cho nhan duoc phan hoi hoac time out 3s
+				while (sub_topic_index<1){
+					if (millis()-time_out>3000) break;
+				}
+				//Kiem tra ban tin nhan ve
+				if (strlen(mqtt_buffer[0])>0) MQTT_Receive((unsigned char*)mqtt_buffer[0]);
+				if(sim800.mqttReceive.topicLen>4)
+					memcpy(topic[0],sim800.mqttReceive.topic,sim800.mqttReceive.topicLen-4);
+				if(sim800.mqttReceive.payloadLen>0)
+					memcpy(payload[0],sim800.mqttReceive.payload,sim800.mqttReceive.payloadLen);
+				if (strcmp((char*)topic[0],pub_topicList[21].cstring) == 0 && strstr((char*)payload[0],"true")){
+					//the hop le
+					debug_send_string("=> the hop le. log in\n");
+					rfid.valid = true;
+					memcpy(driver.id,rfid.serialNumber,5);
+					driver.is_active = true;
+					driver.active_time = 0;
+					for (int x = 0;x<3;x++){
+						buzzer_on();
+						delay_ms(300);
+					}
+				}
+				else {
+					//the khong hop le
+					debug_send_string("=> the khong hop le.\n");
+					rfid.valid = false;
+					for (int x = 0;x<2;x++){
+						buzzer_on();
+						delay_ms(100);
+					}
+				}
+			}
+			else { //the da dang nhap
+				debug_send_string("=> co the dang su dung\n");
+			}
+		}
+//		for (int i=0;i<5;i++) rfid.serialNumber[i]=serNum[i];
+//		date_time2str(sd_buffer, &time_struct);
+//		sprintf(&sd_buffer[strlen(sd_buffer)]," ID=%x%x%x%x%x\r\n",
+//				serNum[0], serNum[1], serNum[2], serNum[3],serNum[4]);
+//		if (sdcard.mount == true) write2file(directory, strlen(directory), (char*)"ID.txt",sd_buffer,strlen(sd_buffer));
 		rfid.t_out = 3;
 		MFRC522_Halt();
 		rfid.present = true;
@@ -210,7 +292,7 @@ void rx_data_subtopic_handler()
 	int i=0,j=0;
 	char buffer[256]={0};
 	char time_str_buffer[20]={0};
-	if(sub_topic_index>=NUM_SUB_TOPIC||(millis()-timeout_rx_topic)>=3000) {//Nhan dc cac Setup Topic tu Broker
+	if(sub_topic_index>=NUM_SUB_TOPIC||(millis()-timeout_rx_topic)>=6000) {//Nhan dc cac Setup Topic tu Broker
 		if (sub_topic_index == 0)return;
 		create_time_str(&Time, time_str_buffer);
 		mqtt_receive = 0;
@@ -235,18 +317,6 @@ void rx_data_subtopic_handler()
 					}
 			}
 			else {
-				if (strcmp((char*)topic[i],pub_topicList[21].cstring) == 0 && strstr((char*)payload[i],"true")){
-					for (int x = 0;x<3;x++){
-						buzzer_on();
-						delay_ms(300);
-					}
-				}
-				else {
-					for (int x = 0;x<2;x++){
-						buzzer_on();
-						delay_ms(100);
-					}
-				}
 				rfid_state = false;
 			}
 		}
@@ -288,7 +358,8 @@ void pub_data_handler()
 	}
 	if ((millis()-time_pub[3])>=freq_array[3]*1000){
 		time_pub[3] = millis();
-		if (gps_l70.RMC.Data_Valid[0]!='V') MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
+//		if (gps_l70.RMC.Data_Valid[0]!='V') MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
+		MQTT_Pub(pub_topicList[11].cstring,json_geowithtime);
 		#ifdef _USE_DEBUG_UART
 			debug_send_string("log: Pub Device Location\n");
 		#endif
@@ -327,7 +398,6 @@ void init_var()
 	sim800.mqttServer.connect = false;
 	sim800.mqttClient.username = "user";
 	sim800.mqttClient.pass = "user";
-	sim800.mqttClient.clientID = "Client01";
 	sim800.mqttClient.keepAliveInterval = 120;
 	sim800.power_state = OFF;
 	sim800.tcp_connect = false;
@@ -411,6 +481,7 @@ void init_pub_topic(MQTTString *topicList,char *topic_buff, char *IMEI){
 
 	sprintf(topic_buff+2100,"mandevices/GSHT_%s/card/code",IMEI);
 	topicList[21].cstring = topic_buff+2100;
+
 }
 void init_sub_topic(MQTTString *topicList,char *topic_buff, char *IMEI){
 	sprintf(topic_buff,"mandevices/GSHT_%s/device/temperature/$freq/set",IMEI);
