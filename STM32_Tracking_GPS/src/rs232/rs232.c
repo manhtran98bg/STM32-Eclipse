@@ -112,7 +112,7 @@ static void tx_one_packet(uint8_t data_type, int data_len, char *content){
 	i = strlen(buff);
 	sprintf(&buff[i],"%d#",check_sum);
 	rs232_send_string(buff);
-	debug_send_string(buff);
+//	debug_send_string(buff);
 }
 void rs232_tx_handler(rx_frame_t *rs232_frame){
 	char buff[30]={0};
@@ -126,7 +126,9 @@ void rs232_tx_handler(rx_frame_t *rs232_frame){
 		tx_one_packet(rs232_frame->data_type, strlen("7,60"), "7,60");
 		tx_one_packet(rs232_frame->data_type, strlen("8,2021/05/27"), "8,2021/05/27");
 		tx_one_packet(rs232_frame->data_type, strlen("9,2021/05/27"), "9,2021/05/27");
-		if (sim800.power_state== OFF || sim800.sim_err == NO_PWR)
+		tx_one_packet(rs232_frame->data_type, strlen("10,3"), "10,3");
+		tx_one_packet(rs232_frame->data_type, strlen("11,1"), "11,1");
+/*		if (sim800.power_state== OFF || sim800.sim_err == NO_PWR)
 			tx_one_packet(rs232_frame->data_type, strlen("10,4"), "10,4");
 		else if (sim800.signal_condition == NOSIGNAL)
 			tx_one_packet(rs232_frame->data_type, strlen("10,0"), "10,0");
@@ -139,7 +141,8 @@ void rs232_tx_handler(rx_frame_t *rs232_frame){
 		else if (gps_l70.RMC.Data_Valid=='V')
 			tx_one_packet(rs232_frame->data_type, strlen("11,0"), "11,0");
 		else if (gps_l70.RMC.Data_Valid=='A')
-			tx_one_packet(rs232_frame->data_type, strlen("11,1"), "11,1");
+			tx_one_packet(rs232_frame->data_type, strlen("11,1"), "11,1");*/
+
 		sprintf(buff,"18,%d/",Time.year+1900);
 		i=strlen(buff);
 		if (Time.mon<10) sprintf(&buff[i],"0%d/",Time.mon);
@@ -157,6 +160,13 @@ void rs232_tx_handler(rx_frame_t *rs232_frame){
 		if (Time.second<10) sprintf(&buff[i],"0%d",Time.second);
 		else sprintf(&buff[i],"%d",Time.second);
 		tx_one_packet(rs232_frame->data_type, strlen(buff), buff);
+//		tx_one_packet(rs232_frame->data_type, strlen(buff), buff);
+		tx_one_packet(rs232_frame->data_type, strlen("12,1"), "12,1");
+		tx_one_packet(rs232_frame->data_type, strlen("13,8589934592"), "13,8589934592");
+		tx_one_packet(rs232_frame->data_type, strlen("14,Nguyen Phung Thuan,790072001864"), "14,Nguyen Phung Thuan,790072001864");
+		tx_one_packet(rs232_frame->data_type, strlen("15,0"), "15,0");
+		tx_one_packet(rs232_frame->data_type, strlen("16,20.9914398,105.8019790"), "16,20.9914398,105.8019790");
+		tx_one_packet(rs232_frame->data_type, strlen("17,40"), "17,40");
 	}
 
 }
