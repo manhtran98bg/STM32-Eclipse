@@ -21,9 +21,9 @@ char sim_buffer[SIM_BUFFER_SIZE];
 uint16_t sim_buffer_index = 0;
 
 uint16_t mqtt_index = 0;
-signed char rssi_arr[31] = {-113,-111,-109,-107,-105,-103,-101,-99,-97,-95,
+signed char rssi_arr[32] = {-113,-111,-109,-107,-105,-103,-101,-99,-97,-95,
 							-93,-91,-89,-87,-85,-83,-81,-79,-77,-75,
-							-73,-71,-69,-67,-65,-63,-61,-59,-57,-55,-53
+							-73,-71,-69,-67,-65,-63,-61,-59,-57,-55,-53, -51
 };
 char res_packet_buffer[32]={0};
 char res_packet_index = 0;

@@ -291,7 +291,8 @@ void gps_RxCallback(gps_t *gps){
 		if (gps->gps_state == GPS_INITED){
 			if(RMC_Parse(&gps->RMC, (char*)gps_buffer, gps_buffer_index)==true)
 			{
-				RMC_json_init(&gps->RMC, json_geowithtime);
+				RMC_json_init(&gps->RMC, json_geowithtime,0);
+				RMC_json_init(&gps->RMC, json_geovelowithtime,1);
 			}
 		}
 		gps_uart_clear_buffer();
@@ -409,7 +410,7 @@ static bool RMC_GetLongitude(RMC_Data *RMC,char *Lon_str)
  * 				"time":"UTC DateTime ISO 8601"
  * 			}
  */
-void RMC_json_init(RMC_Data *RMC, char *buffer)
+void RMC_json_init(RMC_Data *RMC, char *buffer, bool option)
 {
 	char year_buf[5]={0};
 	char mon_buf[5]={0};
@@ -430,12 +431,25 @@ void RMC_json_init(RMC_Data *RMC, char *buffer)
 	else sprintf(min_buf,"%d", RMC->Time.mm);
 	if (RMC->Time.ss<10) sprintf(sec_buf,"0%d", RMC->Time.ss);
 	else sprintf(sec_buf,"%d", RMC->Time.ss);
-	sprintf(buffer,"{\"lng\":\"%s\","
-				   "\"lat\":\"%s\","
-				   "\"time\":\"%s-%s-%sT%s:%s:%s+00:00\"}",RMC->Lon.lon_dec_degree,
-				   RMC->Lat.lat_dec_degree,
-				   year_buf,mon_buf,day_buf,
-				   hour_buf,min_buf,sec_buf);
+	if (option == 0){
+		sprintf(buffer,"{\"lng\":\"%s\","
+					   "\"lat\":\"%s\","
+					   "\"time\":\"%s-%s-%sT%s:%s:%s+00:00\"}",RMC->Lon.lon_dec_degree,
+					   RMC->Lat.lat_dec_degree,
+					   year_buf,mon_buf,day_buf,
+					   hour_buf,min_buf,sec_buf);
+	}
+	else {
+		sprintf(buffer,"{\"lng\":\"%s\","
+					   "\"lat\":\"%s\","
+					   "\"speed\":\"%d\","
+					   "\"time\":\"%s-%s-%sT%s:%s:%s+00:00\"}",RMC->Lon.lon_dec_degree,
+					   RMC->Lat.lat_dec_degree,
+					   (int)RMC->Speed,
+					   year_buf,mon_buf,day_buf,
+					   hour_buf,min_buf,sec_buf);
+	}
+
 }
 static double str2float(char *str)
 {

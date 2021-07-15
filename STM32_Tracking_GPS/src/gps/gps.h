@@ -97,6 +97,7 @@ typedef struct{
 extern gps_t gps_l70;
 extern uint8_t flagStart,flagStop;
 extern char json_geowithtime[];
+extern char json_geovelowithtime[];
 extern char gps_buffer[];
 extern uint16_t gps_buffer_index;
 
@@ -109,7 +110,7 @@ void gps_check_current_baud(gps_t *gps);
 void gps_set_baudrate(uint32_t baud);
 void gps_RxCallback(gps_t *gps);
 bool RMC_Parse(RMC_Data *RMC, char *RMC_Sentence, int RMC_len);
-void RMC_json_init(RMC_Data *RMC, char *buffer);
+void RMC_json_init(RMC_Data *RMC, char *buffer, bool option);
 void gps_uart_send_string(char *str);
 void gps_uart_clear_buffer();
 void gps_uart_send_char( char chr);

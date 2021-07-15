@@ -53,21 +53,24 @@ TM_OneWire_t OneWire1;
 //Struct RFID
 RFID_t rfid;
 //Khai bao cac mang luu topic publish va subcribe can khoi tao truoc.
-MQTTString pub_topicList[40] = MQTTString_initializer;	//Struct array luu topic Pub
+MQTTString pub_topicList[25] = MQTTString_initializer;	//Struct array luu topic Pub
 char pub_topic[25][100]={{0}};		//Pub Topic Buffer Array
-MQTTString sub_topicList[40] = MQTTString_initializer;	//Struct array luu topic Sub
+MQTTString sub_topicList[10] = MQTTString_initializer;	//Struct array luu topic Sub
 char sub_topic[10][100]={{0}};		//Sub Topic Buffer Array
 //Khai bao cac mang luu cac topic va payload nhan duoc tu broker.
-unsigned char topic[6][128]= {{0}};
+unsigned char topic[6][100]= {{0}};
 unsigned char payload[6][32]={{0}};
 int freq_array[6]={5,5,5,5,5,5};	//Default Interval Update Data to Broker
 int requestedQoSs[2]={0};
 
+MQTTString sub_logout_topic = {NULL, {0, NULL}};	//Topic Response Logout RFID
+
 char json_geowithtime[100]={0};		//Buffer Location and Time-Date
+char json_geovelowithtime[100]={0};
 char time_buffer[10]={0};
 uint32_t t_check_connection = 0;	//Interval to check connection with broker, default = 10s
 uint32_t t_lcd_update = 0;			//Interval to update LCD, default = 2s
-uint8_t nosignal_check = 0;			//Flag indicate checked no signal condition.
+bool nosignal_check = 0;			//Flag indicate checked no signal condition.
 bool _1sflag = false;				//RTC 1s update flag.
 unsigned char mqtt_buffer[NUM_SUB_TOPIC][256] = {0};
 float vbat = 0;
@@ -224,9 +227,16 @@ void rfid_handler()
 				memset(driver.id,0,6);
 				debug_send_string("=> log out\n");
 				sprintf(driver_topic,"mandevices/GSHT_%s/card/%s/active_time",sim800.sim_id.imei,str_id);
-				memset(driver_payload,0,128);
+				//Gui thoi gian lam viec len Server
+				clearMqttBuffer();
+				memset(driver_payload,0,64);
+				memset(topic,0,600);
+				memset(payload,0,192);
 				driver_payload_checkout(str_id, &gps_l70.RMC, driver.active_time, driver_payload);
-				MQTT_Pub(driver_topic, driver_payload);
+				for (int k=0;k<3;k++){
+					MQTT_Pub(driver_topic, driver_payload);
+					delay_ms(300);
+				}
 			}
 		}
 		else {
@@ -237,6 +247,8 @@ void rfid_handler()
 				 */
 				clearMqttBuffer();
 				memset(driver_payload,0,128);
+				memset(topic,0,600);
+				memset(payload,0,192);
 				driver_payload_checkin(str_id, &gps_l70.RMC, driver_payload);
 				MQTT_Pub(pub_topicList[21].cstring, driver_payload);
 				time_out = millis();
@@ -261,6 +273,13 @@ void rfid_handler()
 						buzzer_on();
 						delay_ms(300);
 					}
+					int login_topic_len = strlen(sub_topicList[7].cstring);
+					memset(sub_topic[8],0,100);
+					memcpy(sub_topic[8],sub_topicList[7].cstring,100);
+					sprintf(&sub_topic[8][login_topic_len],"/%s/active_time/set",str_id);
+					sub_logout_topic.cstring = sub_topic[8];
+					int qos = 0;
+					MQTT_Sub(&sub_logout_topic, &qos, 1);
 				}
 				else {
 					//the khong hop le
@@ -276,15 +295,10 @@ void rfid_handler()
 				debug_send_string("=> co the dang su dung\n");
 			}
 		}
-//		for (int i=0;i<5;i++) rfid.serialNumber[i]=serNum[i];
-//		date_time2str(sd_buffer, &time_struct);
-//		sprintf(&sd_buffer[strlen(sd_buffer)]," ID=%x%x%x%x%x\r\n",
-//				serNum[0], serNum[1], serNum[2], serNum[3],serNum[4]);
-//		if (sdcard.mount == true) write2file(directory, strlen(directory), (char*)"ID.txt",sd_buffer,strlen(sd_buffer));
-		rfid.t_out = 3;
 		MFRC522_Halt();
 		rfid.present = true;
 		rfid_state = true;
+		rfid.t_out = 3;
 	}
 }
 void rx_data_subtopic_handler()
@@ -305,7 +319,7 @@ void rx_data_subtopic_handler()
 			if(sim800.mqttReceive.payloadLen>0)
 				memcpy(payload[i],sim800.mqttReceive.payload,sim800.mqttReceive.payloadLen);
 			sprintf(buffer,"%s: %s   %s\n",time_str_buffer,topic[i],payload[i]);
-			write2file(directory, strlen(directory), "REMOTE.LOG", buffer, strlen(buffer));
+//			write2file(directory, strlen(directory), "REMOTE.LOG", buffer, strlen(buffer));
 			delay_ms(10);
 			if (rfid_state == false){
 				for (j=0;j<6;j++)
@@ -355,6 +369,8 @@ void pub_data_handler()
 		#ifdef _USE_DEBUG_UART
 			debug_send_string("log: Pub Enviroment Humidity\n");
 		#endif
+		sprintf(payload_buf,"%d",(int)ds18b20[1].temp+10);
+		MQTT_Pub(pub_topicList[10].cstring,payload_buf);	//Temp Enviroment
 	}
 	if ((millis()-time_pub[3])>=freq_array[3]*1000){
 		time_pub[3] = millis();
@@ -375,8 +391,10 @@ void pub_data_handler()
 	if ((millis()-time_pub[5])>=freq_array[5]*1000){
 		time_pub[5] = millis();
 		#ifdef _USE_DEBUG_UART
-			debug_send_string("log: Pub Vehicle RPM\n");
+			debug_send_string("log: Pub Vehicle Speed\n");
 		#endif
+		sprintf(payload_buf,"%d",(int)gps_l70.RMC.Speed);
+		MQTT_Pub(pub_topicList[22].cstring,json_geovelowithtime);	//RSSI
 	}
 	if ((millis()-time_pub[6])>=10000){
 		time_pub[6] = millis();
@@ -455,7 +473,7 @@ void init_pub_topic(MQTTString *topicList,char *topic_buff, char *IMEI){
 	sprintf(topic_buff+1200,"mandevices/GSHT_%s/device/temperature",IMEI);
 	topicList[12].cstring = topic_buff+1200;
 
-	sprintf(topic_buff+1300,"mandevices/GSHT_%s/battery/rate_voltage",IMEI);
+	sprintf(topic_buff+1300,"mandevices/GSHT_%s/vehicle/1/rate_voltage",IMEI);
 	topicList[13].cstring = topic_buff+1300;
 
 	sprintf(topic_buff+1400,"mandevices/GSHT_%s/vehicle/rpm",IMEI);
@@ -482,6 +500,8 @@ void init_pub_topic(MQTTString *topicList,char *topic_buff, char *IMEI){
 	sprintf(topic_buff+2100,"mandevices/GSHT_%s/card/code",IMEI);
 	topicList[21].cstring = topic_buff+2100;
 
+	sprintf(topic_buff+2200,"mandevices/GSHT_%s/vehicle/speed",IMEI);
+	topicList[22].cstring = topic_buff+2200;
 }
 void init_sub_topic(MQTTString *topicList,char *topic_buff, char *IMEI){
 	sprintf(topic_buff,"mandevices/GSHT_%s/device/temperature/$freq/set",IMEI);
@@ -496,8 +516,10 @@ void init_sub_topic(MQTTString *topicList,char *topic_buff, char *IMEI){
 	topicList[4].cstring = topic_buff+400;
 	sprintf(topic_buff+500,"mandevices/GSHT_%s/vehicle/rpm/$freq/set",IMEI);
 	topicList[5].cstring = topic_buff+500;
-	sprintf(topic_buff+600,"mandevices/GSHT_%s/card/code/set",IMEI);
+	sprintf(topic_buff+600,"mandevices/GSHT_%s/card/code/set",IMEI);	//topic phan hoi log in
 	topicList[6].cstring = topic_buff+600;
+	sprintf(topic_buff+700,"mandevices/GSHT_%s/vehicle/set",IMEI);	//topic phan hoi log out
+	topicList[7].cstring = topic_buff+700;
 }
 void first_pub_topic(MQTTString *topicList)
 {
@@ -529,7 +551,8 @@ uint8_t first_sub_topic (MQTTString *topicList)
 	if (MQTT_Sub(&topicList[2], requestedQoSs, 2)) count = count +2;
 	delay_ms(10);
 	if (MQTT_Sub(&topicList[4], requestedQoSs, 2)) count = count +2;
-	if (MQTT_Sub(&topicList[6], 0, 1)) count = count +1;
+	delay_ms(10);
+	if (MQTT_Sub(&topicList[6], requestedQoSs, 2)) count = count +2;
 	sprintf(buf,"log: Number of Topic Subcribed = %d\n",count);
 #if _DEBUG
 	trace_puts(buf);

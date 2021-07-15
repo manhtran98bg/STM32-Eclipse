@@ -107,7 +107,6 @@ void RTC_IRQHandler(void)
 	if (RTC_GetITStatus(RTC_IT_SEC) != RESET)
 	{
 		if (driver.is_active == true) driver.active_time++;
-		else driver.active_time = 0;
 		user_led_toggle();
 		RTC_cnt = RTC_GetCounter();
 		if ((rfid.present == true)&&(rfid.t_out>0)) rfid.t_out--;	//Cho t_out de doc RFID
